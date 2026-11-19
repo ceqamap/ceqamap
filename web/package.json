@@ -1,0 +1,24 @@
+{
+  "name": "@ceqa-atlas/web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --test 'src/**/*.test.ts'"
+  },
+  "dependencies": {
+    "maplibre-gl": "^5.24.1",
+    "pmtiles": "^4.3.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "vite": "^7.3.8"
+  }
+}

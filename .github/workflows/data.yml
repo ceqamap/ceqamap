@@ -1,0 +1,125 @@
+name: Data refresh
+
+# Pulls new documents from CEQAnet and republishes the map data.
+#
+# Schedule: every 3 hours. CEQAnet posts during California business hours, so
+# this keeps the map at most ~3 hours behind. A rebuild is forced once a day
+# even without new documents because comment periods open and close with the
+# calendar. Use "Run workflow" in the Actions tab for a manual refresh or the
+# initial backfill.
+on:
+  schedule:
+    - cron: '17 */3 * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'ingest (recent window) or backfill (history)'
+        type: choice
+        options: [ingest, backfill]
+        default: ingest
+      from:
+        description: 'Backfill start month (YYYY-MM)'
+        default: '1980-01'
+      force_build:
+        description: 'Rebuild and publish even if nothing changed'
+        type: boolean
+        default: false
+
+# Never run two refreshes at once; queue instead of cancelling.
+concurrency:
+  group: data-refresh
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CEQANET_CONTACT: ${{ vars.CEQANET_CONTACT }}
+  R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+  R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+  R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+  R2_BUCKET: ${{ vars.R2_BUCKET }}
+  TIPPECANOE_VERSION: '2.79.0'
+
+jobs:
+  refresh:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --filter @ceqa-atlas/pipeline...
+
+      - name: Backfill history
+        if: inputs.mode == 'backfill'
+        run: pnpm --filter @ceqa-atlas/pipeline backfill --from "${{ inputs.from }}"
+
+      - name: Ingest recent documents
+        id: ingest
+        if: inputs.mode != 'backfill'
+        run: pnpm --filter @ceqa-atlas/pipeline ingest
+
+      - name: Decide whether to rebuild
+        id: decide
+        run: |
+          # Rebuild if documents changed, on a manual force or backfill, or on the
+          # first scheduled run of the day (00:17 UTC) so statuses roll over.
+          if [ "${{ steps.ingest.outputs.changed }}" = "true" ] \
+             || [ "${{ inputs.force_build }}" = "true" ] \
+             || [ "${{ inputs.mode }}" = "backfill" ] \
+             || [ "$(date -u +%H)" = "00" ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Restore tippecanoe
+        if: steps.decide.outputs.build == 'true'
+        id: tippecanoe-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.local/bin/tippecanoe
+          key: tippecanoe-${{ env.TIPPECANOE_VERSION }}-ubuntu-24.04
+
+      - name: Build tippecanoe
+        if: steps.decide.outputs.build == 'true' && steps.tippecanoe-cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update && sudo apt-get install -y build-essential libsqlite3-dev zlib1g-dev
+          git clone --depth 1 --branch "${TIPPECANOE_VERSION}" https://github.com/felt/tippecanoe.git /tmp/tippecanoe
+          make -C /tmp/tippecanoe -j"$(nproc)"
+          mkdir -p ~/.local/bin && cp /tmp/tippecanoe/tippecanoe ~/.local/bin/
+
+      - name: Build data
+        if: steps.decide.outputs.build == 'true'
+        run: |
+          export TIPPECANOE="$HOME/.local/bin/tippecanoe"
+          pnpm --filter @ceqa-atlas/pipeline build-data
+
+      - name: Publish data
+        if: steps.decide.outputs.build == 'true'
+        run: pnpm --filter @ceqa-atlas/pipeline publish-data
+
+  # If the refresh fails, GitHub emails the repository's watchers. This job
+  # additionally opens an issue so failures are visible on the repo itself.
+  report-failure:
+    needs: refresh
+    if: failure() && github.event_name == 'schedule'
+    runs-on: ubuntu-24.04
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/github-script@v9
+        with:
+          script: |
+            const title = 'Data refresh is failing';
+            const open = await github.rest.issues.listForRepo({ ...context.repo, state: 'open', labels: 'data-refresh' });
+            const body = `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            if (open.data.length) {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: open.data[0].number, body });
+            } else {
+              await github.rest.issues.create({ ...context.repo, title, body, labels: ['data-refresh'] });
+            }

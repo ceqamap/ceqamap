@@ -1,0 +1,5 @@
+pnpm-lock.yaml
+.data/
+pipeline/out/
+web/dist/
+pipeline/data/gazetteer.json

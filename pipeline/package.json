@@ -1,0 +1,20 @@
+{
+  "name": "@ceqa-atlas/pipeline",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test 'test/**/*.test.ts'",
+    "typecheck": "tsc -p tsconfig.json",
+    "gazetteer": "node scripts/fetch-gazetteer.ts",
+    "ingest": "node src/jobs/ingest.ts",
+    "backfill": "node src/jobs/backfill.ts",
+    "build-data": "node src/jobs/build.ts",
+    "publish-data": "node src/jobs/publish.ts"
+  },
+  "dependencies": {
+    "aws4fetch": "^1.0.20"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0"
+  }
+}
