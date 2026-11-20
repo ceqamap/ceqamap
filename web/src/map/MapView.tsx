@@ -191,21 +191,22 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
 
   // --- Basemap switching ---------------------------------------------------
   const appliedBasemap = useRef(props.basemap.id);
+  const { basemap } = props;
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || appliedBasemap.current === props.basemap.id) return;
-    appliedBasemap.current = props.basemap.id;
+    if (!map || appliedBasemap.current === basemap.id) return;
+    appliedBasemap.current = basemap.id;
     let cancelled = false;
-    props.basemap
+    basemap
       .style()
       .then((style) => {
         if (!cancelled) map.setStyle(style, { diff: false }); // style.load re-adds our layers
       })
-      .catch((e: Error) => props.onError(e.message));
+      .catch((e: Error) => latest.current.onError(e.message));
     return () => {
       cancelled = true;
     };
-  }, [props.basemap]);
+  }, [basemap]);
 
   // --- New data build: swap the tileset in place ---------------------------
   useEffect(() => {

@@ -3,6 +3,8 @@ import { describe, it } from 'node:test';
 import type { StyleSpecification } from 'maplibre-gl';
 import { PALETTES, paperify, roleFor } from './paperify.ts';
 
+type Layer = { paint: Record<string, unknown>; layout: Record<string, unknown> };
+
 describe('paperify', () => {
   it('assigns roles from OpenMapTiles layer ids and source layers', () => {
     assert.equal(roleFor({ id: 'background', type: 'background' }), 'background');
@@ -32,7 +34,7 @@ describe('paperify', () => {
       ],
     } as unknown as StyleSpecification;
     const out = paperify(style, 'paper');
-    const by = Object.fromEntries(out.layers.map((l) => [l.id, l])) as Record<string, any>;
+    const by = Object.fromEntries(out.layers.map((l) => [l.id, l])) as Record<string, Layer>;
     assert.equal(by.background.paint['background-color'], PALETTES.paper.background);
     assert.equal(by.water.paint['fill-color'], PALETTES.paper.water);
     assert.equal(by.water.paint['fill-pattern'], undefined);

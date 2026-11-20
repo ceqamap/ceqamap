@@ -27,12 +27,17 @@ jobs:
           node-version-file: .nvmrc
           cache: ${{ hashFiles('pnpm-lock.yaml') != '' && 'pnpm' || '' }}
       - name: Install
+        id: install
         run: |
           if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; else pnpm install; fi
       - run: pnpm format:check
       - run: pnpm lint
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
       - run: pnpm typecheck
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
       - run: pnpm test
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
       - run: pnpm build
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           VITE_DATA_URL: https://data.example.invalid
