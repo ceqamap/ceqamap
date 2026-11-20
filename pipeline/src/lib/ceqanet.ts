@@ -89,7 +89,7 @@ export class CeqanetClient {
       try {
         const res = await this.opts.fetchImpl(url, {
           headers: {
-            'User-Agent': `ceqa-atlas/1.0 (+${this.opts.contact})`,
+            'User-Agent': `ceqamap/1.0 (+https://ceqamap.org; ${this.opts.contact})`,
             Accept: 'text/csv',
           },
           signal: AbortSignal.timeout(120_000),

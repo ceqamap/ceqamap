@@ -8,6 +8,18 @@ import type { PublishedMeta, PublishedProject } from '../../../packages/shared/s
 export const DATA_URL = (import.meta.env.VITE_DATA_URL as string | undefined)?.replace(/\/$/, '') || '/data';
 
 export const META_POLL_MS = 5 * 60_000;
+/** Poll faster while no data has been published yet, so it appears promptly. */
+export const META_POLL_PENDING_MS = 60_000;
+
+/** Status shown in the header when meta.json can't be loaded. */
+export class DataStatusError extends Error {
+  /** `pending`: nothing published yet (404). `unreachable`: network or server trouble. */
+  readonly kind: 'pending' | 'unreachable';
+  constructor(kind: 'pending' | 'unreachable', message: string) {
+    super(message);
+    this.kind = kind;
+  }
+}
 
 export function absoluteDataUrl(path: string): string {
   const base = DATA_URL.startsWith('http') ? DATA_URL : `${location.origin}${DATA_URL}`;
@@ -17,9 +29,10 @@ export function absoluteDataUrl(path: string): string {
 export async function fetchMeta(signal?: AbortSignal): Promise<PublishedMeta> {
   // `no-cache` revalidates with the CDN each time; meta.json is tiny.
   const res = await fetch(absoluteDataUrl('meta.json'), { cache: 'no-cache', signal }).catch(() => {
-    throw new Error('Can’t reach the map data right now. Retrying shortly.');
+    throw new DataStatusError('unreachable', 'Can’t reach the map data right now. Retrying shortly.');
   });
-  if (!res.ok) throw new Error(`Map data is temporarily unavailable (${res.status}).`);
+  if (res.status === 404) throw new DataStatusError('pending', 'Preparing the map data. It will appear here shortly.');
+  if (!res.ok) throw new DataStatusError('unreachable', 'The map data is briefly unavailable. Retrying shortly.');
   return (await res.json()) as PublishedMeta;
 }
 

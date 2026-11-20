@@ -3,7 +3,7 @@ import { type PublishedMeta, STATUSES } from '../../../packages/shared/src/index
 import { formatNumber } from '../lib/format.ts';
 
 export function Legend({ meta, mode }: { meta: PublishedMeta | null; mode: 'light' | 'dark' }) {
-  const [open, setOpen] = useState(() => window.innerWidth >= 720);
+  const [open, setOpen] = useState(() => window.innerWidth >= 720 && window.innerHeight >= 680);
   const approx = meta
     ? meta.counts.byPrecision.city + meta.counts.byPrecision.county + meta.counts.byPrecision.region
     : 0;

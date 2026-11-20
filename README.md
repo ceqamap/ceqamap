@@ -1,11 +1,11 @@
-# CEQA Atlas
+# CEQA Map
 
 A live, full‑screen map of every project filed with California's State Clearinghouse under the California
 Environmental Quality Act (CEQA). The data comes from [CEQAnet](https://ceqanet.lci.ca.gov), which is public, but
 CEQAnet only lets you dig through it one search at a time. This site puts all of it on one map and keeps it current
 automatically.
 
-> **Working name.** "CEQA Atlas" is a placeholder. Search the repo for it when the real name is chosen.
+> Live at [ceqamap.org](https://ceqamap.org).
 
 ## How it works
 

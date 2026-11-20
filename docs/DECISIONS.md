@@ -2,8 +2,7 @@
 
 ## Needed from you before launch
 
-1. **Name and domain.** "CEQA Atlas" is a placeholder. Buy the domain (Cloudflare Registrar sells at cost, which
-   keeps DNS, site, and data in one account).
+1. ~~**Name and domain.**~~ Done: "CEQA Map" at ceqamap.org (Cloudflare Registrar).
 2. **Who owns the accounts.** GitHub, Cloudflare, and the domain should belong to the client's organization (or yours,
    with a written handover plan), not a personal account of whoever set them up.
 3. **Public or private repository.** Public is free on GitHub Actions and fine for public data; private keeps the code

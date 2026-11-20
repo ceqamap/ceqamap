@@ -26,8 +26,8 @@ interface Palette {
 export const PALETTES: Record<'paper' | 'night', Palette> = {
   paper: {
     background: '#f4f2ee',
-    water: '#dcdfdc',
-    waterway: '#cfd5d2',
+    water: '#d5dee2',
+    waterway: '#c6d3d8',
     green: '#e9e8df',
     landuse: '#efede8',
     building: '#e6e3dc',

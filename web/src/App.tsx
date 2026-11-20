@@ -5,7 +5,7 @@ import { Drawer } from './components/Drawer.tsx';
 import { Header } from './components/Header.tsx';
 import { HoverCard } from './components/HoverCard.tsx';
 import { Legend } from './components/Legend.tsx';
-import { absoluteDataUrl, fetchMeta, META_POLL_MS } from './lib/data.ts';
+import { absoluteDataUrl, DataStatusError, fetchMeta, META_POLL_MS, META_POLL_PENDING_MS } from './lib/data.ts';
 import { basemapById, type BasemapId } from './map/basemaps.ts';
 import { type HoverInfo, MapView, type MapViewHandle } from './map/MapView.tsx';
 
@@ -32,7 +32,7 @@ const canHover = window.matchMedia('(hover: hover)').matches;
 export function App() {
   const map = useRef<MapViewHandle>(null);
   const [meta, setMeta] = useState<PublishedMeta | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [dataStatus, setDataStatus] = useState<DataStatusError | null>(null);
   const [mapError, setMapError] = useState<string | null>(null);
   const [basemapId, setBasemapId] = useState<BasemapId>(() => basemapById(readParam('b')).id);
   const [selected, setSelected] = useState<string | null>(() => readParam('p'));
@@ -44,23 +44,33 @@ export function App() {
   const tilesUrl = meta ? absoluteDataUrl(meta.tiles) : null;
 
   // Load meta, then poll so the map refreshes itself when new filings land.
+  // Poll every minute until data exists, then every five minutes.
   useEffect(() => {
     let alive = true;
-    const load = () =>
-      fetchMeta()
-        .then((m) => {
-          if (!alive) return;
-          setError(null);
-          setMeta((prev) => (prev?.buildId === m.buildId ? prev : m));
-        })
-        .catch((e: Error) => alive && setError(e.message));
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const load = async () => {
+      clearTimeout(timer);
+      let ok = false;
+      try {
+        const m = await fetchMeta();
+        if (!alive) return;
+        ok = true;
+        setDataStatus(null);
+        setMeta((prev) => (prev?.buildId === m.buildId ? prev : m));
+      } catch (e) {
+        if (!alive) return;
+        setDataStatus(
+          e instanceof DataStatusError ? e : new DataStatusError('unreachable', 'Can’t reach the map data right now.'),
+        );
+      }
+      timer = setTimeout(load, ok ? META_POLL_MS : META_POLL_PENDING_MS);
+    };
     load();
-    const id = setInterval(load, META_POLL_MS);
     const onVisible = () => document.visibilityState === 'visible' && load();
     document.addEventListener('visibilitychange', onVisible);
     return () => {
       alive = false;
-      clearInterval(id);
+      clearTimeout(timer);
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, []);
@@ -107,7 +117,7 @@ export function App() {
         <span className="tick bl" />
         <span className="tick br" />
       </div>
-      <Header meta={meta} error={error} />
+      <Header meta={meta} status={dataStatus} />
       <Controls
         basemap={basemapId}
         onBasemap={changeBasemap}

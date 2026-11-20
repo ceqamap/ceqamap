@@ -163,8 +163,17 @@ a {
   color: var(--muted);
 }
 
-.live-error {
-  color: #b4361b;
+.live-dot.pending {
+  background: var(--faint);
+}
+.live-dot.pending::after {
+  border-color: var(--faint);
+}
+.live-dot.unreachable {
+  background: #e8590c;
+}
+.live-dot.unreachable::after {
+  display: none;
 }
 
 .live-dot {
@@ -708,6 +717,16 @@ a {
     border-radius: 20px 20px 0 0;
     transform: translateY(100%);
     padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Short windows: keep the header compact so it never meets the legend. */
+@media (max-height: 640px) {
+  .header-sub {
+    display: none;
+  }
+  .live {
+    margin-top: 8px;
   }
 }
 

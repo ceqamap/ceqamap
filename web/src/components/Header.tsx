@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import type { PublishedMeta } from '../../../packages/shared/src/index.ts';
+import type { DataStatusError } from '../lib/data.ts';
 import { formatNumber, timeAgo } from '../lib/format.ts';
 
-export function Header({ meta, error }: { meta: PublishedMeta | null; error: string | null }) {
+export function Header({ meta, status }: { meta: PublishedMeta | null; status: DataStatusError | null }) {
   // Re-render every minute so "updated N minutes ago" stays honest.
   const [, setTick] = useState(0);
   useEffect(() => {
@@ -12,11 +13,14 @@ export function Header({ meta, error }: { meta: PublishedMeta | null; error: str
 
   return (
     <header className="header card">
-      <h1 className="wordmark">CEQA Atlas</h1>
+      <h1 className="wordmark">CEQA Map</h1>
       <p className="header-sub">Every project filed with California’s State Clearinghouse, on one map.</p>
       <p className="live" aria-live="polite">
-        {error ? (
-          <span className="live-error">{error}</span>
+        {status && !meta ? (
+          <>
+            <span className={`live-dot ${status.kind}`} aria-hidden="true" />
+            <span>{status.message}</span>
+          </>
         ) : meta ? (
           <>
             <span className="live-dot" aria-hidden="true" />
