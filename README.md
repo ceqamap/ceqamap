@@ -86,7 +86,7 @@ Before pushing, run `pnpm check` (formatting, lint, types, tests). CI runs the s
    | Variable | `DATA_URL`              | e.g. `https://data.example.org/data`       |
    | Variable | `CEQANET_CONTACT`       | an email the State Clearinghouse can reach |
 
-4. **Load history.** Actions → Data refresh → Run workflow → mode `backfill`. About an hour for 1980 to today. It
+4. **Load history.** Actions → Data refresh → Run workflow → mode `backfill`. About 90 minutes for 1980 to today. It
    resumes where it left off if interrupted. After that the scheduled refresh keeps it current on its own.
 
 ## When something breaks

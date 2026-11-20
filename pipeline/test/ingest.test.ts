@@ -46,6 +46,26 @@ describe('CeqanetClient', () => {
     assert.equal(calls.length, 3);
   });
 
+  it('backs off and retries when CEQAnet throttles with 403', async () => {
+    const waits: number[] = [];
+    const { impl, calls } = fakeFetch([
+      () => new Response('Forbidden', { status: 403 }),
+      () => new Response(body(csv)),
+    ]);
+    const c = new CeqanetClient({
+      contact: 'x',
+      fetchImpl: impl,
+      sleep: async (ms) => {
+        waits.push(ms);
+      },
+      minIntervalMs: 0,
+    });
+    const r = await c.fetchRange('2026-11-01', '2026-11-18');
+    assert.equal(r.records.length, 1);
+    assert.equal(calls.length, 2);
+    assert.ok(waits.includes(60_000), `expected a 60 s backoff, got ${waits.join(', ')}`);
+  });
+
   it('does not retry a 404', async () => {
     const { impl, calls } = fakeFetch([() => new Response('nope', { status: 404 })]);
     const c = new CeqanetClient({ contact: 'x', fetchImpl: impl, sleep: noSleep, minIntervalMs: 0 });

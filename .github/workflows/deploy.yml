@@ -31,8 +31,10 @@ jobs:
       - run: pnpm build
         env:
           VITE_DATA_URL: ${{ vars.DATA_URL }}
-      - uses: cloudflare/wrangler-action@v4
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy
+      # Run Wrangler directly: wrangler-action tries to add itself to the pnpm
+      # workspace root, which pnpm refuses.
+      - name: Deploy to Cloudflare
+        run: npx --yes wrangler@4 deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

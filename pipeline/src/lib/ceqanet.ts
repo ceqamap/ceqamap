@@ -47,8 +47,8 @@ export class CeqanetClient {
   constructor(opts: CeqanetClientOptions) {
     if (!opts.contact) throw new Error('CeqanetClient requires a contact (set CEQANET_CONTACT)');
     this.opts = {
-      minIntervalMs: 3000,
-      maxAttempts: 6,
+      minIntervalMs: 8000,
+      maxAttempts: 7,
       fetchImpl: fetch,
       sleep: realSleep,
       ...opts,
@@ -94,7 +94,10 @@ export class CeqanetClient {
           },
           signal: AbortSignal.timeout(120_000),
         });
-        if (res.status === 429 || res.status >= 500) throw new Error(`HTTP ${res.status}`);
+        // CEQAnet answers 403 (not 429) when it decides we are going too fast;
+        // observed from GitHub Actions on 2026-11-19 after ~10 requests in 30 s.
+        if (res.status === 403 || res.status === 429) throw new Error(`HTTP ${res.status}`, { cause: 'throttled' });
+        if (res.status >= 500) throw new Error(`HTTP ${res.status}`);
         if (!res.ok) throw new Error(`HTTP ${res.status} (not retrying)`, { cause: 'fatal' });
         const raw = decodeCeqaCsv(await res.arrayBuffer());
         const parsed = parseCeqaCsv(raw); // throws CsvSchemaError on empty / changed schema
@@ -104,7 +107,10 @@ export class CeqanetClient {
         if (err instanceof Error && err.cause === 'fatal') break;
         // A changed schema will not fix itself; only retry empties.
         if (err instanceof CsvSchemaError && !/Empty/.test(err.message)) break;
-        const backoff = Math.min(120_000, 2 ** attempt * 2000);
+        const throttled = err instanceof Error && err.cause === 'throttled';
+        const backoff = throttled
+          ? Math.min(600_000, 60_000 * 2 ** (attempt - 1)) // 1, 2, 4, 8, 10 min
+          : Math.min(120_000, 2 ** attempt * 2000);
         log.warn('CEQAnet request failed; backing off', { start, end, attempt, backoff, error: String(err) });
         await this.opts.sleep(backoff);
       }

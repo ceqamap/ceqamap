@@ -5,8 +5,8 @@
  *
  * Months already stored are skipped unless --force is passed, so this can be
  * run repeatedly inside GitHub Actions' 6 hour job limit until it finishes.
- * About 560 months at a 3 s pace plus fetch time takes roughly 45 to 60
- * minutes.
+ * About 560 months at an 8 s pace takes roughly 75 to 90 minutes, longer if
+ * CEQAnet throttles us.
  */
 import { parseArgs } from 'node:util';
 import { gzipSync } from 'node:zlib';

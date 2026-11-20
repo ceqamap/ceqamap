@@ -31,7 +31,7 @@ The pipeline's lenient parser (`pipeline/src/lib/csv.ts`) recovered **100%** of 
 logged, never guessed at.
 
 Also observed: rapid back‑to‑back requests sometimes return an **empty** 200 response. The client paces requests
-(3 s apart), treats empty responses as failures, and retries with backoff.
+(8 s apart; CEQAnet answered 403 to requests 3 s apart from GitHub's servers), treats empty responses as failures, and retries with backoff.
 
 ## Location: the biggest limitation
 
