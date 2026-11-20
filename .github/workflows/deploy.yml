@@ -39,7 +39,8 @@ jobs:
 
       - name: Keep the preview out of search engines
         if: github.event_name == 'pull_request'
-        run: printf '\n/*\n  X-Robots-Tag: noindex, nofollow\n' >> web/dist/_headers
+        run: |
+          printf '\n/*\n  X-Robots-Tag: noindex, nofollow\n' >> web/dist/_headers
 
       # Run Wrangler directly: wrangler-action tries to add itself to the pnpm
       # workspace root, which pnpm refuses.
