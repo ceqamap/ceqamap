@@ -1,0 +1,48 @@
+name: Bootstrap
+
+# One-time setup that needs the open internet: generates pnpm-lock.yaml (exact
+# dependency versions) and the Census place reference file, applies the code
+# formatter, then commits the result.
+# Runs automatically on the first push and does nothing once they exist.
+# Safe to delete after it has run.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check what is missing
+        id: need
+        run: |
+          echo "lock=$([ -f pnpm-lock.yaml ] && echo false || echo true)" >> "$GITHUB_OUTPUT"
+          echo "gaz=$([ -f pipeline/data/gazetteer.json ] && echo false || echo true)" >> "$GITHUB_OUTPUT"
+      - uses: pnpm/action-setup@v6
+        if: steps.need.outputs.lock == 'true' || steps.need.outputs.gaz == 'true'
+      - uses: actions/setup-node@v7
+        if: steps.need.outputs.lock == 'true' || steps.need.outputs.gaz == 'true'
+        with:
+          node-version-file: .nvmrc
+      - name: Install and format
+        if: steps.need.outputs.lock == 'true'
+        run: |
+          pnpm install
+          pnpm format
+      - name: Generate place reference file
+        if: steps.need.outputs.gaz == 'true'
+        run: pnpm --filter @ceqa-atlas/pipeline gazetteer
+      - name: Commit
+        if: steps.need.outputs.lock == 'true' || steps.need.outputs.gaz == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet || git commit -m "Bootstrap: lockfile, Census place reference, formatting"
+          git push

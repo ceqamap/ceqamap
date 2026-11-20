@@ -43,6 +43,8 @@ env:
 
 jobs:
   refresh:
+    # Skips until the R2 settings exist (see README, One-time production setup).
+    if: vars.R2_BUCKET != ''
     runs-on: ubuntu-24.04
     timeout-minutes: 350
     steps:
@@ -51,8 +53,12 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile --filter @ceqa-atlas/pipeline...
+          cache: ${{ hashFiles('pnpm-lock.yaml') != '' && 'pnpm' || '' }}
+      - name: Install
+        run: |
+          if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile --filter @ceqa-atlas/pipeline...; else pnpm install --filter @ceqa-atlas/pipeline...; fi
+      - name: Ensure place reference file
+        run: test -f pipeline/data/gazetteer.json || pnpm --filter @ceqa-atlas/pipeline gazetteer
 
       - name: Backfill history
         if: inputs.mode == 'backfill'
