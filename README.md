@@ -89,6 +89,16 @@ Before pushing, run `pnpm check` (formatting, lint, types, tests). CI runs the s
 4. **Load history.** Actions → Data refresh → Run workflow → mode `backfill`. About 90 minutes for 1980 to today. It
    resumes where it left off if interrupted. After that the scheduled refresh keeps it current on its own.
 
+## Making changes
+
+Every change goes through a pull request:
+
+1. Work happens on a branch, and a pull request is opened against `main`.
+2. CI checks it, and it deploys automatically to **https://preview.ceqamap.org**. A comment on the pull request
+   links there. The preview shows whichever pull request was updated most recently.
+3. Review the preview in the browser. Request changes on the pull request, or approve it.
+4. Merging into `main` publishes it to **https://ceqamap.org** about two minutes later.
+
 ## When something breaks
 
 - A failing scheduled refresh opens a GitHub issue labeled `data-refresh`. The site keeps serving the last good

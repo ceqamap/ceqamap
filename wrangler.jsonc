@@ -9,10 +9,22 @@
     // Unknown paths fall back to index.html (shared links like /?p=... always work).
     "not_found_handling": "single-page-application",
   },
-  // Serve on our own domain only. Deploy creates the DNS records and certificates.
+  // Production: our own domain only. Deploy creates the DNS records and certificates.
   "workers_dev": false,
   "routes": [
     { "pattern": "ceqamap.org", "custom_domain": true },
     { "pattern": "www.ceqamap.org", "custom_domain": true },
   ],
+  "env": {
+    // Pull requests deploy here for review before merging (`wrangler deploy --env preview`).
+    // Worker name: ceqamap-preview.
+    "preview": {
+      "assets": {
+        "directory": "./web/dist",
+        "not_found_handling": "single-page-application",
+      },
+      "workers_dev": false,
+      "routes": [{ "pattern": "preview.ceqamap.org", "custom_domain": true }],
+    },
+  },
 }
