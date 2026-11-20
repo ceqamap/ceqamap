@@ -82,10 +82,13 @@ export function fetchProject(sch: string): Promise<PublishedProject> {
   if (!/^\d{10}$/.test(sch)) return Promise.reject(new Error('Invalid SCH number'));
   let p = projectCache.get(sch);
   if (!p) {
-    p = baseChosen.then(() => fetch(absoluteDataUrl(`projects/${sch}.json`))).then(async (res) => {
-      if (!res.ok) throw new Error(res.status === 404 ? 'Project not found' : `Could not load project (${res.status})`);
-      return (await res.json()) as PublishedProject;
-    });
+    p = baseChosen
+      .then(() => fetch(absoluteDataUrl(`projects/${sch}.json`)))
+      .then(async (res) => {
+        if (!res.ok)
+          throw new Error(res.status === 404 ? 'Project not found' : `Could not load project (${res.status})`);
+        return (await res.json()) as PublishedProject;
+      });
     p = p.catch((e: unknown) => {
       projectCache.delete(sch); // allow a retry after failures
       throw e instanceof TypeError ? new Error('Can’t reach the map data right now') : e;
