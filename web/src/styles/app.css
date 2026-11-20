@@ -387,6 +387,11 @@ a {
   border-radius: 50%;
   box-shadow: 0 0 0 1.5px var(--card);
 }
+/* On dark basemaps the legend shows the dark-mode colors on a light card;
+   a hairline keeps the near-white "Approved" swatch visible. */
+.dot.dark {
+  box-shadow: 0 0 0 1px var(--line-strong);
+}
 .dot.solid {
   background: var(--ink-2);
 }
