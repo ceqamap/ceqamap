@@ -1,0 +1,12 @@
+// Cloudflare Workers static-assets config for the website.
+// The site is fully static; no Worker script runs. Data is served separately from R2.
+{
+  "$schema": "https://unpkg.com/wrangler/config-schema.json",
+  "name": "ceqamap",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./web/dist",
+    // Unknown paths fall back to index.html (shared links like /?p=... always work).
+    "not_found_handling": "single-page-application",
+  },
+}

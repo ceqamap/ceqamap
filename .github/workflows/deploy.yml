@@ -1,25 +1,23 @@
 name: Deploy site
 
-# Every push to main deploys the site to Cloudflare Pages. Pull requests get
-# their own preview URL, posted by Cloudflare on the PR.
+# Every push to main builds the site and deploys it to Cloudflare Workers
+# (static assets). Pull requests are built and checked by CI but not deployed.
 on:
   push:
     branches: [main]
-  pull_request:
   workflow_dispatch:
 
 concurrency:
-  group: deploy-${{ github.ref }}
+  group: deploy
   cancel-in-progress: true
 
 permissions:
   contents: read
-  deployments: write
 
 jobs:
   deploy:
     # Skips until the Cloudflare settings exist (see README, One-time production setup).
-    if: vars.PAGES_PROJECT != ''
+    if: vars.DATA_URL != ''
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -28,10 +26,8 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-          cache: ${{ hashFiles('pnpm-lock.yaml') != '' && 'pnpm' || '' }}
-      - name: Install
-        run: |
-          if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; else pnpm install; fi
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - run: pnpm build
         env:
           VITE_DATA_URL: ${{ vars.DATA_URL }}
@@ -39,4 +35,4 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy web/dist --project-name=${{ vars.PAGES_PROJECT }} --branch=${{ github.head_ref || github.ref_name }}
+          command: deploy

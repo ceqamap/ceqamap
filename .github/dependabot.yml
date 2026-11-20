@@ -1,5 +1,7 @@
 version: 2
 updates:
+  # Minor and patch updates arrive weekly as one grouped PR. Major versions are
+  # upgraded deliberately (see docs/DECISIONS.md), so Dependabot skips them.
   - package-ecosystem: npm
     directory: /
     schedule:
@@ -7,6 +9,9 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
   - package-ecosystem: github-actions
     directory: /
     schedule:
