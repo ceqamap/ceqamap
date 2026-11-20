@@ -7,6 +7,17 @@ import type { PublishedMeta, PublishedProject } from '../../../packages/shared/s
  */
 export const DATA_URL = (import.meta.env.VITE_DATA_URL as string | undefined)?.replace(/\/$/, '') || '/data';
 
+/**
+ * On preview.ceqamap.org, a pull request that changes the data publishes its
+ * own build to preview-data. Use it only if it was built from this preview's
+ * branch; otherwise show the live data.
+ */
+const PREVIEW_DATA_URL = (import.meta.env.VITE_PREVIEW_DATA_URL as string | undefined)?.replace(/\/$/, '');
+const PREVIEW_REF = import.meta.env.VITE_PREVIEW_REF as string | undefined;
+
+/** The data origin in use; switches to preview data when it matches. */
+let activeBase = DATA_URL;
+
 export const META_POLL_MS = 5 * 60_000;
 /** Poll faster while no data has been published yet, so it appears promptly. */
 export const META_POLL_PENDING_MS = 60_000;
@@ -22,11 +33,29 @@ export class DataStatusError extends Error {
 }
 
 export function absoluteDataUrl(path: string): string {
-  const base = DATA_URL.startsWith('http') ? DATA_URL : `${location.origin}${DATA_URL}`;
+  const base = activeBase.startsWith('http') ? activeBase : `${location.origin}${activeBase}`;
   return `${base}/${path.replace(/^\//, '')}`;
 }
 
+async function previewMeta(signal?: AbortSignal): Promise<PublishedMeta | null> {
+  if (!PREVIEW_DATA_URL || !PREVIEW_REF) return null;
+  try {
+    const res = await fetch(`${PREVIEW_DATA_URL}/meta.json`, { cache: 'no-cache', signal });
+    if (!res.ok) return null;
+    const meta = (await res.json()) as PublishedMeta;
+    return meta.ref === PREVIEW_REF ? meta : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchMeta(signal?: AbortSignal): Promise<PublishedMeta> {
+  const preview = await previewMeta(signal);
+  if (preview) {
+    activeBase = PREVIEW_DATA_URL!;
+    return preview;
+  }
+  activeBase = DATA_URL;
   // `no-cache` revalidates with the CDN each time; meta.json is tiny.
   const res = await fetch(absoluteDataUrl('meta.json'), { cache: 'no-cache', signal }).catch(() => {
     throw new DataStatusError('unreachable', 'Can’t reach the map data right now. Retrying shortly.');

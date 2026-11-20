@@ -184,6 +184,8 @@ export interface PublishedProject {
     counties: string[];
     crossStreets: string | null;
     zip: string | null;
+    /** The agency's coordinates contradicted the listed county and were not used. */
+    coordinatesRejected: boolean;
   } | null;
   facts: {
     totalAcres: number | null;
@@ -202,6 +204,8 @@ export interface PublishedProject {
 export interface PublishedMeta {
   /** Changes on every rebuild; used to bust tile caches. */
   buildId: string;
+  /** Git branch the data was built from (preview data only checks this). */
+  ref?: string;
   builtAt: string;
   /** Path (relative to the data origin) of the current tileset. */
   tiles: string;
@@ -214,6 +218,8 @@ export interface PublishedMeta {
     unmapped: number;
     byStatus: Record<ProjectStatus, number>;
     byPrecision: Record<LocationPrecision, number>;
+    /** Projects whose agency coordinates were discarded as inconsistent. */
+    coordinatesRejected?: number;
   };
 }
 

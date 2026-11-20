@@ -15,7 +15,7 @@ import type { PublishedMeta } from '../../../packages/shared/src/index.ts';
 import { aggregate } from '../lib/aggregate.ts';
 import { todayInCalifornia } from '../lib/ceqanet.ts';
 import type { CeqaDocument } from '../lib/document.ts';
-import type { Gazetteer } from '../lib/gazetteer.ts';
+import type { Boundaries } from '../lib/boundaries.ts';
 import { log } from '../lib/log.ts';
 import { listPartitionMonths, readPartition } from '../lib/partitions.ts';
 import { storageFromEnv } from '../lib/storage.ts';
@@ -23,8 +23,9 @@ import { storageFromEnv } from '../lib/storage.ts';
 const OUT = new URL('../../out/', import.meta.url).pathname;
 const storage = storageFromEnv();
 
-const gazetteerPath = process.env.GAZETTEER_PATH ?? new URL('../../data/gazetteer.json', import.meta.url).pathname;
-const gazetteer = JSON.parse(await readFile(gazetteerPath, 'utf8')) as Gazetteer;
+const boundariesPath =
+  process.env.BOUNDARIES_PATH ?? new URL('../../data/boundaries.json', import.meta.url).pathname;
+const boundaries = JSON.parse(await readFile(boundariesPath, 'utf8')) as Boundaries;
 
 const docs: CeqaDocument[] = [];
 for (const month of await listPartitionMonths(storage)) docs.push(...(await readPartition(storage, month)));
@@ -32,7 +33,7 @@ if (docs.length === 0) throw new Error('No documents in storage. Run backfill fi
 
 const builtAt = new Date().toISOString();
 const today = todayInCalifornia();
-const result = aggregate(docs, gazetteer, today, builtAt);
+const result = aggregate(docs, boundaries, today, builtAt);
 
 await rm(OUT, { recursive: true, force: true });
 await mkdir(join(OUT, 'projects'), { recursive: true });

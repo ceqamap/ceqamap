@@ -7,7 +7,7 @@ import {
   type TilePointProperties,
 } from '../../../packages/shared/src/index.ts';
 import type { CeqaDocument } from './document.ts';
-import type { Gazetteer } from './gazetteer.ts';
+import type { Boundaries } from './boundaries.ts';
 import { resolveLocation } from './location.ts';
 import { deriveStatus } from './status.ts';
 
@@ -66,14 +66,14 @@ function pickDescription(newestFirst: CeqaDocument[]): string {
 export function buildProject(
   sch: string,
   docs: CeqaDocument[],
-  gaz: Gazetteer,
+  boundaries: Boundaries,
   today: string,
   builtAt: string,
 ): PublishedProject {
   const newestFirst = [...docs].sort((a, b) => (a.received < b.received ? 1 : a.received > b.received ? -1 : 0));
   const latest = newestFirst[0];
   const status = deriveStatus(docs, today);
-  const loc = resolveLocation(sch, newestFirst, gaz);
+  const loc = resolveLocation(sch, newestFirst, boundaries);
   const placeDoc = newestFirst.find((d) => d.cities.length || d.counties.length) ?? latest;
 
   return {
@@ -93,6 +93,7 @@ export function buildProject(
           counties: placeDoc.counties,
           crossStreets: firstNonEmpty(newestFirst.map((d) => d.crossStreets)) || null,
           zip: firstNonEmpty(newestFirst.map((d) => d.zip)) || null,
+          coordinatesRejected: loc.coordinatesRejected,
         }
       : null,
     facts: {
@@ -122,7 +123,7 @@ function round6(n: number): number {
 
 export function aggregate(
   docs: Iterable<CeqaDocument>,
-  gaz: Gazetteer,
+  boundaries: Boundaries,
   today: string,
   builtAt: string,
 ): AggregateResult {
@@ -135,16 +136,18 @@ export function aggregate(
   >;
   const byPrecision = { exact: 0, city: 0, county: 0, region: 0 } satisfies Record<LocationPrecision, number>;
   let documents = 0;
+  let coordinatesRejected = 0;
   let latestReceived = '';
 
   for (const [sch, list] of groups) {
     documents += list.length;
     for (const d of list) if (d.received > latestReceived) latestReceived = d.received;
-    const p = buildProject(sch, list, gaz, today, builtAt);
+    const p = buildProject(sch, list, boundaries, today, builtAt);
     projects.push(p);
     byStatus[p.status]++;
     if (p.location) {
       byPrecision[p.location.precision]++;
+      if (p.location.coordinatesRejected) coordinatesRejected++;
       points.push({
         type: 'Feature',
         geometry: { type: 'Point', coordinates: [p.location.lon, p.location.lat] },
@@ -170,6 +173,7 @@ export function aggregate(
       unmapped: projects.length - points.length,
       byStatus,
       byPrecision,
+      coordinatesRejected,
     },
   };
 }

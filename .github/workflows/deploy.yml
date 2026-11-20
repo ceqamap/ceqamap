@@ -33,8 +33,16 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build
+      - name: Build
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # The preview uses data built from this branch when there is some (see data.yml, target=preview).
+            export VITE_PREVIEW_DATA_URL="${DATA_URL%/data}/preview-data"
+            export VITE_PREVIEW_REF="${{ github.head_ref }}"
+          fi
+          pnpm build
         env:
+          DATA_URL: ${{ vars.DATA_URL }}
           VITE_DATA_URL: ${{ vars.DATA_URL }}
 
       - name: Keep the preview out of search engines

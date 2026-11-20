@@ -1,7 +1,7 @@
 name: Bootstrap
 
 # One-time setup that needs the open internet: generates pnpm-lock.yaml (exact
-# dependency versions) and the Census place reference file, applies the code
+# dependency versions) and the Census city/county boundaries, applies the code
 # formatter, then commits the result.
 # Runs automatically on the first push and does nothing once they exist.
 # Safe to delete after it has run.
@@ -23,7 +23,7 @@ jobs:
         id: need
         run: |
           echo "lock=$([ -f pnpm-lock.yaml ] && echo false || echo true)" >> "$GITHUB_OUTPUT"
-          echo "gaz=$([ -f pipeline/data/gazetteer.json ] && echo false || echo true)" >> "$GITHUB_OUTPUT"
+          echo "gaz=$([ -f pipeline/data/boundaries.json ] && echo false || echo true)" >> "$GITHUB_OUTPUT"
       - uses: pnpm/action-setup@v6
         if: steps.need.outputs.lock == 'true' || steps.need.outputs.gaz == 'true'
       - uses: actions/setup-node@v7
@@ -35,9 +35,11 @@ jobs:
         run: |
           pnpm install
           pnpm format
-      - name: Generate place reference file
+      - name: Generate city and county boundaries
         if: steps.need.outputs.gaz == 'true'
-        run: pnpm --filter @ceqa-atlas/pipeline gazetteer
+        run: |
+          pnpm install --frozen-lockfile --filter @ceqa-atlas/pipeline...
+          pnpm --filter @ceqa-atlas/pipeline boundaries
       - name: Commit
         if: steps.need.outputs.lock == 'true' || steps.need.outputs.gaz == 'true'
         run: |

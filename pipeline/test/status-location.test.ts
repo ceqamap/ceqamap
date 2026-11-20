@@ -2,8 +2,9 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { aggregate, truncate } from '../src/lib/aggregate.ts';
 import { normalizeRecord, splitList, toIsoDate } from '../src/lib/document.ts';
-import { buildGazetteer, normalizePlaceName, parseGazetteerFile } from '../src/lib/gazetteer.ts';
-import { haversineKm, jitter, resolveLocation } from '../src/lib/location.ts';
+import { type Boundaries, normalizePlaceName, toArea } from '../src/lib/boundaries.ts';
+import { pointInShape, type Ring } from '../src/lib/geometry.ts';
+import { haversineKm, resolveLocation } from '../src/lib/location.ts';
 import { deriveStatus } from '../src/lib/status.ts';
 import { doc } from './helpers.ts';
 
@@ -90,29 +91,34 @@ describe('document normalization', () => {
   });
 });
 
-// A miniature gazetteer in the Census's own format (tab-delimited, padded last header).
-const PLACES = [
-  'USPS\tGEOID\tANSICODE\tNAME\tLSAD\tFUNCSTAT\tALAND\tAWATER\tALAND_SQMI\tAWATER_SQMI\tINTPTLAT\tINTPTLONG                                                                                                               ',
-  'CA\t0659444\t02411573\tRedding city\t25\tA\t155000000\t3000000\t59.8\t1.2\t40.5865\t-122.3917',
-  'CA\t0602252\t02409698\tAnderson city\t25\tA\t17000000\t0\t6.6\t0\t40.4521\t-122.2970',
-  'CA\t0644000\t02410877\tLos Angeles city\t25\tA\t1214000000\t87000000\t468.7\t33.6\t34.0194\t-118.4108',
-  'CA\t0606308\t02409892\tCañada CDP\t57\tS\t5000000\t0\t1.9\t0\t37.6000\t-122.4000',
-  'NV\t3240000\t02410923\tReno city\t25\tA\t280000000\t0\t108\t0\t39.5\t-119.8',
-].join('\n');
-const COUNTIES = [
-  'USPS|GEOID|ANSICODE|NAME|ALAND|AWATER|ALAND_SQMI|AWATER_SQMI|INTPTLAT|INTPTLONG',
-  'CA|06089|00277309|Shasta County|9779000000|180000000|3775.8|69.6|40.7637|-122.0405',
-  'CA|06029|02054176|Kern County|21062000000|80000000|8132.5|30.9|35.3431|-118.7298',
-  'CA|06107|00277318|Tulare County|12495000000|40000000|4824.4|15.4|36.2205|-118.7809',
-  'CA|06015|01682074|Del Norte County|2606000000|580000000|1006.4|224|41.7499|-123.9809',
-].join('\n');
-const GAZ = buildGazetteer(parseGazetteerFile(PLACES), parseGazetteerFile(COUNTIES));
+// Miniature boundaries: simple rectangles standing in for Census outlines.
+const rect = (w: number, s: number, e: number, n: number): Ring => [
+  [w, s],
+  [e, s],
+  [e, n],
+  [w, n],
+  [w, s],
+];
+const area = (name: string, ...rings: Ring[]) => toArea(name, rings)!;
+const B: Boundaries = {
+  places: {
+    redding: area('Redding', rect(-122.45, 40.53, -122.32, 40.65)),
+    anderson: area('Anderson', rect(-122.33, 40.43, -122.27, 40.47)),
+    'los angeles': area('Los Angeles', rect(-118.6, 33.75, -118.15, 34.3)),
+    // Mainland plus a tiny island 40 km offshore, like San Francisco and the Farallones.
+    'san francisco': area('San Francisco', rect(-122.51, 37.71, -122.36, 37.81), rect(-123.01, 37.69, -122.99, 37.71)),
+  },
+  counties: {
+    shasta: area('Shasta', rect(-123.07, 40.29, -121.32, 41.19)),
+    kern: area('Kern', rect(-120.19, 34.79, -117.62, 35.79)),
+    tulare: area('Tulare', rect(-119.57, 35.79, -117.98, 36.75)),
+    'del norte': area('Del Norte', rect(-124.25, 41.46, -123.52, 42.0)),
+    mendocino: area('Mendocino', rect(-123.85, 38.76, -122.82, 40.0)),
+    'san francisco': area('San Francisco', rect(-122.51, 37.71, -122.36, 37.81), rect(-123.01, 37.69, -122.99, 37.71)),
+  },
+};
 
-describe('gazetteer', () => {
-  it('parses tab and pipe delimited files and filters to California', () => {
-    assert.equal(Object.keys(GAZ.places).length, 4);
-    assert.equal(Object.keys(GAZ.counties).length, 4);
-  });
+describe('boundaries', () => {
   it('normalizes names across CEQAnet and Census spellings', () => {
     assert.equal(normalizePlaceName('City of Redding'), 'redding');
     assert.equal(normalizePlaceName('Redding city'), 'redding');
@@ -123,58 +129,100 @@ describe('gazetteer', () => {
 });
 
 describe('resolveLocation', () => {
-  it('prefers typed coordinates from the newest document', () => {
-    const r = resolveLocation('x', [doc({ coordinates: `40°34'57"N 122°23'47"W`, cities: ['Redding'] })], GAZ);
+  it('accepts typed coordinates inside the listed county', () => {
+    const r = resolveLocation('x', [doc({ coordinates: `40°34'57"N 122°23'47"W`, counties: ['Shasta'] })], B);
     assert.equal(r?.precision, 'exact');
+    assert.equal(r?.coordinatesRejected, false);
+  });
+
+  it('accepts coordinates just outside the county line (coastal and harbor work)', () => {
+    // Shasta's west edge is -123.07; this is ~3 km west of it.
+    const r = resolveLocation('x', [doc({ coordinates: '40.8, -123.105', counties: ['Shasta'] })], B);
+    assert.equal(r?.precision, 'exact');
+  });
+
+  it('rejects a latitude typo that contradicts the listed county (Ukiah at 36° instead of 39°)', () => {
+    const r = resolveLocation(
+      '2024050310',
+      [doc({ coordinates: `36°12'42"N 123°12'20"W`, cities: ['Nowhere'], counties: ['Mendocino'] })],
+      B,
+    )!;
+    assert.equal(r.precision, 'county');
+    assert.equal(r.coordinatesRejected, true);
+    assert.ok(pointInShape(r.lon, r.lat, B.counties.mendocino.shape));
+  });
+
+  it('falls back to an older document whose coordinates are plausible', () => {
+    const r = resolveLocation(
+      'x',
+      [doc({ coordinates: '36.2, -123.2', counties: ['Mendocino'] }), doc({ coordinates: '39.15, -123.2' })],
+      B,
+    );
+    assert.equal(r?.precision, 'exact');
+    assert.equal(r?.lat, 39.15);
+  });
+
+  it('with no county listed, rejects coordinates far from California', () => {
+    const r = resolveLocation('x', [doc({ coordinates: '33.0, -126.5' })], B);
+    assert.equal(r, null);
   });
 
   it('places single-city projects inside the city, deterministically', () => {
     const d = [doc({ cities: ['Redding'], counties: ['Shasta'] })];
-    const a = resolveLocation('2025100575', d, GAZ);
-    const b = resolveLocation('2025100575', d, GAZ);
-    assert.equal(a?.precision, 'city');
-    assert.deepEqual(a, b);
-    assert.ok(haversineKm(a!, GAZ.places.redding) <= 8.01);
+    const a = resolveLocation('2025100575', d, B)!;
+    assert.equal(a.precision, 'city');
+    assert.deepEqual(a, resolveLocation('2025100575', d, B));
+    assert.ok(pointInShape(a.lon, a.lat, B.places.redding.shape));
   });
 
-  it('spreads different projects in the same city apart', () => {
-    const d = [doc({ cities: ['Los Angeles'] })];
-    const a = resolveLocation('2026000001', d, GAZ)!;
-    const b = resolveLocation('2026000002', d, GAZ)!;
-    assert.ok(haversineKm(a, b) > 0.05);
+  it('never puts San Francisco projects in the ocean, and rarely on the island', () => {
+    let island = 0;
+    for (let i = 0; i < 500; i++) {
+      const r = resolveLocation(`2026${String(i).padStart(6, '0')}`, [doc({ cities: ['San Francisco'] })], B)!;
+      assert.ok(pointInShape(r.lon, r.lat, B.places['san francisco'].shape));
+      if (r.lon < -122.9) island++;
+    }
+    // The island is ~1.5% of the area; allow generous noise.
+    assert.ok(island < 25, `${island} of 500 landed on the island`);
   });
 
-  it('averages nearby cities', () => {
-    const r = resolveLocation('x', [doc({ cities: ['Redding', 'Anderson'] })], GAZ);
-    assert.equal(r?.precision, 'city');
+  it('spreads consecutive SCH numbers apart instead of along a curve', () => {
+    const pts = Array.from({ length: 300 }, (_, i) =>
+      resolveLocation(`2026${String(i).padStart(6, '0')}`, [doc({ cities: ['Los Angeles'] })], B)!,
+    );
+    // Neighbors in SCH order should be about as far apart as random pairs, not adjacent.
+    const step = pts.slice(1).map((p, i) => haversineKm(p, pts[i]));
+    const meanStep = step.reduce((s, x) => s + x, 0) / step.length;
+    assert.ok(meanStep > 10, `consecutive points average only ${meanStep.toFixed(1)} km apart`);
   });
 
-  it('falls back to county when the city is unknown', () => {
-    const r = resolveLocation('x', [doc({ cities: ['Nowhere Junction'], counties: ['Kern'] })], GAZ);
-    assert.equal(r?.precision, 'county');
+  it('averages nearby cities and keeps the point inside one of them', () => {
+    const r = resolveLocation('x', [doc({ cities: ['Redding', 'Anderson'] })], B)!;
+    assert.equal(r.precision, 'city');
+    assert.ok(
+      pointInShape(r.lon, r.lat, B.places.redding.shape) || pointInShape(r.lon, r.lat, B.places.anderson.shape),
+    );
   });
 
-  it('treats unincorporated as no city', () => {
-    const r = resolveLocation('x', [doc({ cities: ['Unincorporated'], counties: ['Kern'] })], GAZ);
-    assert.equal(r?.precision, 'county');
+  it('falls back to county when the city is unknown, and treats unincorporated as no city', () => {
+    assert.equal(
+      resolveLocation('x', [doc({ cities: ['Nowhere Junction'], counties: ['Kern'] })], B)?.precision,
+      'county',
+    );
+    assert.equal(
+      resolveLocation('x', [doc({ cities: ['Unincorporated'], counties: ['Kern'] })], B)?.precision,
+      'county',
+    );
   });
 
   it('marks nearby multi-county projects as region', () => {
-    const r = resolveLocation('x', [doc({ counties: ['Kern', 'Tulare'] })], GAZ);
-    assert.equal(r?.precision, 'region');
+    assert.equal(resolveLocation('x', [doc({ counties: ['Kern', 'Tulare'] })], B)?.precision, 'region');
   });
 
   it('does not map far-apart or statewide projects', () => {
-    assert.equal(resolveLocation('x', [doc({ counties: ['Kern', 'Del Norte'] })], GAZ), null);
-    assert.equal(resolveLocation('x', [doc({ counties: ['Kern', 'Tulare', 'Shasta', 'Del Norte'] })], GAZ), null);
-    assert.equal(resolveLocation('x', [doc({})], GAZ), null);
-  });
-
-  it('jitter stays within its radius', () => {
-    for (let i = 0; i < 200; i++) {
-      const p = jitter({ lon: -120, lat: 37 }, 5, String(i));
-      assert.ok(haversineKm(p, { lon: -120, lat: 37 }) <= 5.01);
-    }
+    assert.equal(resolveLocation('x', [doc({ counties: ['Kern', 'Del Norte'] })], B), null);
+    assert.equal(resolveLocation('x', [doc({ counties: ['Kern', 'Tulare', 'Shasta', 'Del Norte'] })], B), null);
+    assert.equal(resolveLocation('x', [doc({})], B), null);
   });
 });
 
@@ -198,7 +246,7 @@ describe('aggregate', () => {
         counties: ['Kern', 'Tulare', 'Shasta', 'Del Norte'],
       }),
     ];
-    const r = aggregate(docs, GAZ, TODAY, '2026-11-18T00:00:00Z');
+    const r = aggregate(docs, B, TODAY, '2026-11-18T00:00:00Z');
     assert.equal(r.counts.projects, 2);
     assert.equal(r.counts.documents, 3);
     assert.equal(r.counts.mapped, 1);

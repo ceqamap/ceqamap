@@ -37,35 +37,34 @@ Also observed: rapid back‑to‑back requests sometimes return an **empty** 200
 
 Each project gets the best location available, in this order:
 
-| Precision | Source                                                        | On the map          |
-| --------- | ------------------------------------------------------------- | ------------------- |
-| Exact     | Coordinates typed by the lead agency                          | Solid dot           |
-| City      | The listed city (or 2–3 nearby cities), from Census Gazetteer | Hollow ring         |
-| County    | The listed county                                             | Hollow ring         |
-| Region    | 2–3 neighboring counties                                      | Hollow ring         |
-| None      | Statewide, or counties far apart                              | Not mapped; counted |
+| Precision | Source                                                                  | On the map          |
+| --------- | ----------------------------------------------------------------------- | ------------------- |
+| Exact     | Coordinates typed by the lead agency, if consistent with listed county  | Solid dot           |
+| City      | A seeded random spot inside the listed city (Census outline)            | Hollow ring         |
+| County    | A seeded random spot inside the listed county (Census outline)          | Hollow ring         |
+| Region    | Inside one of 2–3 neighboring listed counties                           | Hollow ring         |
+| None      | Statewide, or counties far apart                                        | Not mapped; counted |
 
-What the samples showed:
+Only about 11% of projects (38,000 of 335,000) have agency coordinates; nothing before roughly 2010 does.
+**Most points on the map are approximate**, and say so with a hollow ring and a line in the drawer.
 
-| Month    | With coordinates | City only | County only |
-| -------- | ---------------- | --------- | ----------- |
-| Oct 2026 | about 1 in 3     | ~39%      | ~20%        |
-| Mar 2021 | ~23%             | ~41%      | ~26%        |
-| Mar 2015 | ~31%             | ~37%      | ~31%        |
-| Mar 2005 | **0%**           | ~55%      | ~44%        |
-| Mar 1995 | **0%**           | ~64%      | ~33%        |
+How placement works, and why (lessons from the first full build, 2026‑11‑20):
 
-So **most points on the map are approximate**, and nothing before roughly 2010 has real coordinates. Approximate
-points are scattered deterministically inside a disk sized to the place's land area, so 4,000 Los Angeles
-projects do not stack on one pixel, and a project always lands in the same spot. The hollow ring tells visitors the
-spot is approximate, and the drawer says so in words.
+- **Real outlines, not center points.** Approximate points are drawn inside the U.S. Census cartographic boundary
+  for the city or county (2024, 1:500k, clipped to the shoreline), weighted by area. The first version used a single
+  Census "internal point" per place; San Francisco's is about 30 km offshore because its boundary includes the
+  Farallon Islands, which put roughly 1,700 projects in the Pacific.
+- **Seeded randomness.** A project's spot is random but derived from its SCH number, so it never moves between
+  rebuilds. The first version's seed mixing was weak and laid consecutive projects out along spirals.
+- **Agency coordinates are checked.** Coordinates must fall inside, or within 5 km of, a county the project lists
+  (25 km of California when no county is listed). Otherwise they are treated as a typo, the project is placed by
+  city or county, and the drawer explains why. Example: SCH 2024050310 near Ukiah was filed as 36°12′N instead of
+  about 39°12′N, which is 330 km south and out to sea. `meta.json` reports how many were rejected.
 
-Ways to improve this later, roughly in order of value:
+Ways to improve this later:
 
-1. Scatter inside the real city or county boundary (Census TIGER polygons) instead of a disk, so points never land
-   in the ocean or a neighboring city.
-2. Geocode the **cross streets** and **ZIP code** fields, which many coordinate‑less records have.
-3. Match **parcel numbers** (APNs) against county parcel layers. Most precise, most work (58 counties, 58 formats).
+1. Geocode the **cross streets** and **ZIP code** fields, which many coordinate‑less records have.
+2. Match **parcel numbers** (APNs) against county parcel layers. Most precise, most work (58 counties, 58 formats).
 
 ## Status: inferred, not reported
 

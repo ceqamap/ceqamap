@@ -24,10 +24,15 @@ on:
         description: 'Rebuild and publish even if nothing changed'
         type: boolean
         default: false
+      target:
+        description: 'production, or preview (build this branch into preview-data for review; no fetching)'
+        type: choice
+        options: [production, preview]
+        default: production
 
 # Never run two refreshes at once; queue instead of cancelling.
 concurrency:
-  group: data-refresh
+  group: data-refresh-${{ inputs.target || 'production' }}
   cancel-in-progress: false
 
 permissions:
@@ -57,16 +62,16 @@ jobs:
       - name: Install
         run: |
           if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile --filter @ceqa-atlas/pipeline...; else pnpm install --filter @ceqa-atlas/pipeline...; fi
-      - name: Ensure place reference file
-        run: test -f pipeline/data/gazetteer.json || pnpm --filter @ceqa-atlas/pipeline gazetteer
+      - name: Ensure city and county boundaries
+        run: test -f pipeline/data/boundaries.json || pnpm --filter @ceqa-atlas/pipeline boundaries
 
       - name: Backfill history
-        if: inputs.mode == 'backfill'
+        if: inputs.mode == 'backfill' && inputs.target != 'preview'
         run: pnpm --filter @ceqa-atlas/pipeline backfill --from "${{ inputs.from }}"
 
       - name: Ingest recent documents
         id: ingest
-        if: inputs.mode != 'backfill'
+        if: inputs.mode != 'backfill' && inputs.target != 'preview'
         run: pnpm --filter @ceqa-atlas/pipeline ingest
 
       - name: Decide whether to rebuild
@@ -77,6 +82,7 @@ jobs:
           if [ "${{ steps.ingest.outputs.changed }}" = "true" ] \
              || [ "${{ inputs.force_build }}" = "true" ] \
              || [ "${{ inputs.mode }}" = "backfill" ] \
+             || [ "${{ inputs.target }}" = "preview" ] \
              || [ "$(date -u +%H)" = "00" ]; then
             echo "build=true" >> "$GITHUB_OUTPUT"
           else
@@ -108,6 +114,8 @@ jobs:
       - name: Publish data
         if: steps.decide.outputs.build == 'true'
         run: pnpm --filter @ceqa-atlas/pipeline publish-data
+        env:
+          PUBLISH_PREFIX: ${{ inputs.target == 'preview' && 'preview-data' || 'data' }}
 
   # If the refresh fails, GitHub emails the repository's watchers. This job
   # additionally opens an issue so failures are visible on the repo itself.

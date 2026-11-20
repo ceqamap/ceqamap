@@ -138,6 +138,12 @@ function ProjectDetail({
           {p.location && <span className="muted"> · {PRECISION_LABEL[p.location.precision]}</span>}
         </p>
       )}
+      {p.location?.coordinatesRejected && (
+        <p className="drawer-note muted">
+          The coordinates filed with CEQAnet fall outside the listed county, so this project is placed within its
+          listed {p.location.precision === 'city' ? 'city' : 'county'} instead.
+        </p>
+      )}
 
       {description && (
         <section className="drawer-section">
