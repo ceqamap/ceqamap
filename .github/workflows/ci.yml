@@ -3,6 +3,7 @@ name: CI
 # Runs on every pull request and every push to main. A PR cannot merge unless
 # this passes (enable "Require status checks" in branch protection).
 on:
+  workflow_dispatch:
   pull_request:
   push:
     branches: [main]

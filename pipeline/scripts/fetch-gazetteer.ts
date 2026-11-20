@@ -8,7 +8,7 @@
  * Requires the `unzip` command (present on macOS, Linux, and GitHub runners).
  */
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildGazetteer, parseGazetteerFile } from '../src/lib/gazetteer.ts';
@@ -44,5 +44,6 @@ if (places.length < 1000 || counties.length !== 58) {
 }
 const gaz = buildGazetteer(places, counties);
 const out = new URL('../data/gazetteer.json', import.meta.url);
+await mkdir(new URL('../data/', import.meta.url), { recursive: true });
 await writeFile(out, JSON.stringify({ vintage: VINTAGE, ...gaz }));
 console.log(`Wrote ${Object.keys(gaz.places).length} places and ${Object.keys(gaz.counties).length} counties`);
