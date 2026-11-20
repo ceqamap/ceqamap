@@ -145,7 +145,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
           MapGeoJSONFeature | undefined;
         if (!f) return latest.current.onSelect(null);
         if (f.properties.point_count) {
-          const [lon, lat] = (f.geometry as GeoJSON.Point).coordinates;
+          const [lon, lat] = (f.geometry as { coordinates: [number, number] }).coordinates;
           map!.easeTo({
             center: [lon, lat],
             zoom: Math.min(map!.getZoom() + 2, 14),

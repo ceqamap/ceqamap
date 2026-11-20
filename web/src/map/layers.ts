@@ -30,10 +30,16 @@ export interface LayerTheme {
 
 function statusColor(mode: 'light' | 'dark'): ExpressionSpecification {
   const pairs = STATUSES.flatMap((s) => [s.id, s[mode]]);
-  return ['match', ['get', 's'], ...pairs, STATUSES.at(-1)![mode]] as ExpressionSpecification;
+  // Built from the shared status list, which MapLibre's fixed tuple types cannot describe.
+  return ['match', ['get', 's'], ...pairs, STATUSES.at(-1)![mode]] as unknown as ExpressionSpecification;
 }
 
-const sortKey = ['match', ['get', 's'], ...STATUSES.flatMap((s) => [s.id, s.z]), 0] as ExpressionSpecification;
+const sortKey = [
+  'match',
+  ['get', 's'],
+  ...STATUSES.flatMap((s) => [s.id, s.z]),
+  0,
+] as unknown as ExpressionSpecification;
 
 const isCluster: ExpressionSpecification = ['has', 'point_count'];
 const notCluster: ExpressionSpecification = ['!', ['has', 'point_count']];
