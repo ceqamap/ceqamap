@@ -17,7 +17,7 @@ automatically.
                           ▼
                      Cloudflare R2 bucket  ──(CDN)──►  Browser
                      data/meta.json                      MapLibre map
-                     data/tiles/*.pmtiles                (Cloudflare Pages)
+                     data/tiles/*.pmtiles                (Cloudflare Workers)
                      data/projects/<sch>.json
 ```
 
@@ -70,8 +70,9 @@ Before pushing, run `pnpm check` (formatting, lint, types, tests). CI runs the s
      bucket's Settings so files are served through the CDN. Add a CORS rule allowing `GET` and `HEAD` from your site's
      origin, exposing the `ETag`, `Content-Length`, and `Content-Range` headers (PMTiles needs them).
    - Create an R2 API token with read and write access to that bucket only.
-   - **Pages:** create a Pages project (Direct Upload) and attach your domain to it.
-   - Create an API token with the "Cloudflare Pages: Edit" permission.
+   - **Website:** nothing to create; the first deploy creates a Worker named `ceqamap` (see `wrangler.jsonc`).
+     Attach your domain to it afterwards under Workers & Pages → ceqamap → Settings → Domains & Routes.
+   - Create an API token with the "Workers Scripts: Edit" permission.
 3. **GitHub repository settings → Secrets and variables → Actions**
 
    | Kind     | Name                    | Value                                      |
@@ -80,10 +81,9 @@ Before pushing, run `pnpm check` (formatting, lint, types, tests). CI runs the s
    | Secret   | `R2_ACCESS_KEY_ID`      | from the R2 token                          |
    | Secret   | `R2_SECRET_ACCESS_KEY`  | from the R2 token                          |
    | Secret   | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account ID                      |
-   | Secret   | `CLOUDFLARE_API_TOKEN`  | the Pages token                            |
+   | Secret   | `CLOUDFLARE_API_TOKEN`  | the Workers deploy token                   |
    | Variable | `R2_BUCKET`             | bucket name                                |
    | Variable | `DATA_URL`              | e.g. `https://data.example.org/data`       |
-   | Variable | `PAGES_PROJECT`         | Pages project name                         |
    | Variable | `CEQANET_CONTACT`       | an email the State Clearinghouse can reach |
 
 4. **Load history.** Actions → Data refresh → Run workflow → mode `backfill`. About an hour for 1980 to today. It
