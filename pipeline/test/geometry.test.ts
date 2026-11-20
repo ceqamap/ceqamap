@@ -60,8 +60,21 @@ describe('geometry', () => {
   });
 
   it('simplifies rings while keeping their corners', () => {
-    const noisy: Ring = [[0, 0], [0.5, 0.00001], [1, 0], [1, 1], [0, 1], [0, 0]];
-    assert.deepEqual(simplifyRing(noisy, 0.001), [[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]);
+    const noisy: Ring = [
+      [0, 0],
+      [0.5, 0.00001],
+      [1, 0],
+      [1, 1],
+      [0, 1],
+      [0, 0],
+    ];
+    assert.deepEqual(simplifyRing(noisy, 0.001), [
+      [0, 0],
+      [1, 0],
+      [1, 1],
+      [0, 1],
+      [0, 0],
+    ]);
   });
 });
 

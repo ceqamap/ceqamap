@@ -23,8 +23,7 @@ import { storageFromEnv } from '../lib/storage.ts';
 const OUT = new URL('../../out/', import.meta.url).pathname;
 const storage = storageFromEnv();
 
-const boundariesPath =
-  process.env.BOUNDARIES_PATH ?? new URL('../../data/boundaries.json', import.meta.url).pathname;
+const boundariesPath = process.env.BOUNDARIES_PATH ?? new URL('../../data/boundaries.json', import.meta.url).pathname;
 const boundaries = JSON.parse(await readFile(boundariesPath, 'utf8')) as Boundaries;
 
 const docs: CeqaDocument[] = [];
