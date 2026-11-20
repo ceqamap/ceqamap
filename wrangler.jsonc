@@ -9,4 +9,10 @@
     // Unknown paths fall back to index.html (shared links like /?p=... always work).
     "not_found_handling": "single-page-application",
   },
+  // Serve on our own domain only. Deploy creates the DNS records and certificates.
+  "workers_dev": false,
+  "routes": [
+    { "pattern": "ceqamap.org", "custom_domain": true },
+    { "pattern": "www.ceqamap.org", "custom_domain": true },
+  ],
 }
