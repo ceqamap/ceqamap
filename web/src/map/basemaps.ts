@@ -7,6 +7,8 @@ import type { StyleSpecification } from 'maplibre-gl';
  *                https://openfreemap.org
  *   USGS TNM     The National Map tile caches; U.S. public domain
  *                https://basemap.nationalmap.gov
+ *                (USGSImageryTopo was retired by 2026-11; "Aerial + labels" is now
+ *                composed from USGSImageryOnly plus OpenFreeMap labels.)
  *
  * "Paper" and "Night" are OpenFreeMap styles recolored at load time to match
  * the site's palette (see paperify.ts), so we get a custom cartographic look
@@ -56,6 +58,19 @@ function usgs(service: string, maxzoom: number): () => Promise<StyleSpecificatio
   });
 }
 
+/** USGS aerial imagery with OpenStreetMap labels drawn on top. */
+async function imageryWithLabels(): Promise<StyleSpecification> {
+  const [imagery, vector] = await Promise.all([usgs('USGSImageryOnly', 16)(), openFreeMap('positron')]);
+  const { labelOverlay } = await import('./paperify.ts');
+  return {
+    ...imagery,
+    glyphs: vector.glyphs ?? GLYPHS,
+    sprite: vector.sprite,
+    sources: { ...imagery.sources, ...vector.sources },
+    layers: [...imagery.layers, ...labelOverlay(vector)],
+  };
+}
+
 async function openFreeMap(name: string, recolor?: 'paper' | 'night'): Promise<StyleSpecification> {
   const res = await fetch(`https://tiles.openfreemap.org/styles/${name}`).catch(() => null);
   if (!res?.ok) throw new Error('This base map couldn’t load. Try another under Layers.');
@@ -74,7 +89,7 @@ export const BASEMAPS: readonly Basemap[] = [
   { id: 'streets', label: 'Streets', mode: 'light', swatch: '#f2efe9', style: () => openFreeMap('liberty') },
   { id: 'topo', label: 'USGS Topo', mode: 'light', swatch: '#d9e4c8', style: usgs('USGSTopo', 16) },
   { id: 'imagery', label: 'Aerial', mode: 'dark', swatch: '#4a5a3c', style: usgs('USGSImageryOnly', 16) },
-  { id: 'hybrid', label: 'Aerial + labels', mode: 'dark', swatch: '#5d6b4c', style: usgs('USGSImageryTopo', 16) },
+  { id: 'hybrid', label: 'Aerial + labels', mode: 'dark', swatch: '#5d6b4c', style: imageryWithLabels },
   { id: 'relief', label: 'Shaded relief', mode: 'light', swatch: '#cfcac0', style: usgs('USGSShadedReliefOnly', 13) },
 ];
 

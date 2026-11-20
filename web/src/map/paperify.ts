@@ -122,3 +122,35 @@ export function paperify(style: StyleSpecification, palette: 'paper' | 'night'):
   );
   return { ...style, layers: quiet };
 }
+
+/**
+ * Turn an OpenMapTiles style into a transparent overlay for aerial imagery:
+ * place names, major roads, and boundaries only, in white with a dark halo.
+ * Used for "Aerial + labels" after USGS retired its USGSImageryTopo service.
+ */
+export function labelOverlay(style: StyleSpecification): LayerSpecification[] {
+  const keep = (l: LayerSpecification) => {
+    const id = l.id.toLowerCase();
+    if (/poi|housenumber|aerodrome|airport|mountain_peak|water_name|waterway/.test(id)) return false;
+    if (l.type === 'symbol') return Boolean((l.layout as Record<string, unknown> | undefined)?.['text-field']);
+    if (l.type === 'line') return /boundary|admin|motorway|trunk|primary/.test(id) && !/casing|tunnel/.test(id);
+    return false;
+  };
+  return style.layers.filter(keep).map((l): LayerSpecification => {
+    if (l.type === 'symbol') {
+      const layout = { ...(l.layout ?? {}) } as Record<string, unknown>;
+      delete layout['icon-image'];
+      return {
+        ...l,
+        id: `labels-${l.id}`,
+        layout,
+        paint: { 'text-color': '#ffffff', 'text-halo-color': 'rgba(0, 0, 0, 0.75)', 'text-halo-width': 1.4 },
+      } as LayerSpecification;
+    }
+    const isBoundary = /boundary|admin/.test(l.id.toLowerCase());
+    const paint = { ...(l.paint ?? {}) } as Record<string, unknown>;
+    paint['line-color'] = isBoundary ? 'rgba(255, 255, 255, 0.55)' : 'rgba(255, 255, 255, 0.35)';
+    delete paint['line-opacity'];
+    return { ...l, id: `labels-${l.id}`, paint } as LayerSpecification;
+  });
+}
