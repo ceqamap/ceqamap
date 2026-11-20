@@ -106,7 +106,7 @@ const B: Boundaries = {
     anderson: area('Anderson', rect(-122.33, 40.43, -122.27, 40.47)),
     'los angeles': area('Los Angeles', rect(-118.6, 33.75, -118.15, 34.3)),
     // Mainland plus a tiny island 40 km offshore, like San Francisco and the Farallones.
-    'san francisco': area('San Francisco', rect(-122.51, 37.71, -122.36, 37.81), rect(-123.01, 37.69, -122.99, 37.71)),
+    'san francisco': area('San Francisco', rect(-122.51, 37.71, -122.36, 37.81), rect(-123.005, 37.695, -122.995, 37.705)),
   },
   counties: {
     shasta: area('Shasta', rect(-123.07, 40.29, -121.32, 41.19)),
@@ -114,7 +114,7 @@ const B: Boundaries = {
     tulare: area('Tulare', rect(-119.57, 35.79, -117.98, 36.75)),
     'del norte': area('Del Norte', rect(-124.25, 41.46, -123.52, 42.0)),
     mendocino: area('Mendocino', rect(-123.85, 38.76, -122.82, 40.0)),
-    'san francisco': area('San Francisco', rect(-122.51, 37.71, -122.36, 37.81), rect(-123.01, 37.69, -122.99, 37.71)),
+    'san francisco': area('San Francisco', rect(-122.51, 37.71, -122.36, 37.81), rect(-123.005, 37.695, -122.995, 37.705)),
   },
 };
 
@@ -152,6 +152,26 @@ describe('resolveLocation', () => {
     assert.ok(pointInShape(r.lon, r.lat, B.counties.mendocino.shape));
   });
 
+  it('rejects coordinates far from the listed city even if inside its county (San Mateo, 122.565 for 122.315)', () => {
+    const b2: Boundaries = {
+      ...B,
+      places: { ...B.places, 'san mateo': area('San Mateo', rect(-122.36, 37.53, -122.28, 37.59)) },
+      counties: { ...B.counties, 'san mateo': area('San Mateo', rect(-122.52, 37.1, -122.1, 37.71)) },
+    };
+    const r = resolveLocation(
+      '2016102067',
+      [doc({ coordinates: '37.565, -122.565', cities: ['San Mateo'], counties: ['San Mateo'] })],
+      b2,
+    )!;
+    assert.equal(r.precision, 'city');
+    assert.equal(r.coordinatesRejected, true);
+  });
+
+  it('accepts coordinates a few km outside the listed city', () => {
+    const r = resolveLocation('x', [doc({ coordinates: '40.70, -122.40', cities: ['Redding'] })], B);
+    assert.equal(r?.precision, 'exact');
+  });
+
   it('falls back to an older document whose coordinates are plausible', () => {
     const r = resolveLocation(
       'x',
@@ -175,15 +195,12 @@ describe('resolveLocation', () => {
     assert.ok(pointInShape(a.lon, a.lat, B.places.redding.shape));
   });
 
-  it('never puts San Francisco projects in the ocean, and rarely on the island', () => {
-    let island = 0;
+  it('never puts San Francisco projects in the ocean or on its small offshore island', () => {
     for (let i = 0; i < 500; i++) {
       const r = resolveLocation(`2026${String(i).padStart(6, '0')}`, [doc({ cities: ['San Francisco'] })], B)!;
       assert.ok(pointInShape(r.lon, r.lat, B.places['san francisco'].shape));
-      if (r.lon < -122.9) island++;
+      assert.ok(r.lon > -122.9, 'placed on the island');
     }
-    // The island is ~1.5% of the area; allow generous noise.
-    assert.ok(island < 25, `${island} of 500 landed on the island`);
   });
 
   it('spreads consecutive SCH numbers apart instead of along a curve', () => {

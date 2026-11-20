@@ -2,7 +2,7 @@ import type { LocationPrecision } from '../../../packages/shared/src/index.ts';
 import { type Area, type Boundaries, normalizePlaceName } from './boundaries.ts';
 import { parseCoordinates } from './coordinates.ts';
 import type { CeqaDocument } from './document.ts';
-import { distanceToShapeKm, inBBox, pointInShape, samplePointInShape } from './geometry.ts';
+import { areaKm2, bboxOf, distanceToShapeKm, inBBox, pointInShape, samplePointInShape } from './geometry.ts';
 import { seededRandom } from './random.ts';
 
 /**
@@ -10,9 +10,11 @@ import { seededRandom } from './random.ts';
  *
  * Order of preference:
  *   1. Coordinates typed by the lead agency (most recent document first),
- *      but only if they fall inside, or within a few km of, a county the
- *      project lists. Agencies make typos (36° for 39° puts Ukiah in the
- *      Pacific); a point that contradicts the project's own county is wrong.
+ *      but only if they agree with the places the project lists: within
+ *      10 km of a listed city, or else within 5 km of a listed county.
+ *      Agencies make typos (36° for 39° puts Ukiah in the Pacific; 122.565
+ *      for 122.315 puts downtown San Mateo 22 km offshore but still "in" the
+ *      county); a point that contradicts the project's own places is wrong.
  *   2. A random spot inside the listed city (or 2–3 nearby cities).
  *   3. A random spot inside the listed county (or 2–3 nearby counties).
  *   4. Nothing: statewide and multi-region projects are not mapped.
@@ -20,6 +22,8 @@ import { seededRandom } from './random.ts';
  * "Random" is seeded by the SCH number, so a project lands in the same spot
  * on every rebuild, and spots are drawn inside the real Census outline, which
  * is clipped to the shoreline, so approximate points never land in the ocean.
+ * Small outlying islands (under 2% of a place's area, e.g. the Farallones in
+ * San Francisco) are skipped when placing approximate points.
  */
 
 export interface ResolvedLocation {
@@ -32,6 +36,10 @@ export interface ResolvedLocation {
 
 /** Coastal, harbor, and border projects can sit just outside the county line. */
 export const COORDINATE_TOLERANCE_KM = 5;
+/** Projects often sit just outside the city they list (unincorporated edges). */
+export const CITY_TOLERANCE_KM = 10;
+/** Islands smaller than this share of a place's area don't receive approximate points. */
+const MIN_RING_SHARE = 0.02;
 /** With no county to check against: allow state waters and nearshore work. */
 const STATE_TOLERANCE_KM = 25;
 const MAX_CITY_SPREAD_KM = 40;
@@ -73,6 +81,20 @@ function nearAny(lon: number, lat: number, areas: Area[], toleranceKm: number): 
   return candidates.some((a) => distanceToShapeKm(lon, lat, a.shape) <= toleranceKm);
 }
 
+const samplingCache = new WeakMap<Area, Area>();
+
+/** The area without small outlying rings, for placing approximate points. */
+function samplingArea(a: Area): Area {
+  let s = samplingCache.get(a);
+  if (!s) {
+    const rings = a.shape.filter((ring) => areaKm2([ring]) >= a.areaKm2 * MIN_RING_SHARE);
+    const shape = rings.length > 0 ? rings : a.shape;
+    s = { ...a, shape, bbox: bboxOf(shape) };
+    samplingCache.set(a, s);
+  }
+  return s;
+}
+
 /** A seeded random point inside one of the areas, chosen in proportion to their size. */
 function placeWithin(areas: Area[], rand: () => number): { lon: number; lat: number } | null {
   const total = areas.reduce((s, a) => s + a.areaKm2, 0);
@@ -85,7 +107,8 @@ function placeWithin(areas: Area[], rand: () => number): { lon: number; lat: num
       break;
     }
   }
-  return samplePointInShape(chosen.shape, chosen.bbox, rand);
+  const target = samplingArea(chosen);
+  return samplePointInShape(target.shape, target.bbox, rand);
 }
 
 export function resolveLocation(
@@ -97,14 +120,17 @@ export function resolveLocation(
   const cities = (placeDoc?.cities ?? []).filter((c) => !/unincorporated|various|statewide|countywide/i.test(c));
   const counties = (placeDoc?.counties ?? []).filter((c) => !/various|statewide/i.test(c));
   const countyAreas = counties.length > 0 && counties.length <= 10 ? lookup(counties, b.counties) : null;
+  const cityAreas = cities.length > 0 && cities.length <= MAX_LISTED_CITIES ? lookup(cities, b.places) : null;
 
   let coordinatesRejected = false;
   for (const d of docsNewestFirst) {
     const p = parseCoordinates(d.coordinates);
     if (!p) continue;
-    const plausible = countyAreas
-      ? nearAny(p.lon, p.lat, countyAreas, COORDINATE_TOLERANCE_KM)
-      : nearAny(p.lon, p.lat, Object.values(b.counties), STATE_TOLERANCE_KM);
+    const plausible = cityAreas
+      ? nearAny(p.lon, p.lat, cityAreas, CITY_TOLERANCE_KM)
+      : countyAreas
+        ? nearAny(p.lon, p.lat, countyAreas, COORDINATE_TOLERANCE_KM)
+        : nearAny(p.lon, p.lat, Object.values(b.counties), STATE_TOLERANCE_KM);
     if (plausible) return { ...p, precision: 'exact', coordinatesRejected: false };
     coordinatesRejected = true;
   }
@@ -112,9 +138,9 @@ export function resolveLocation(
   if (!placeDoc) return null;
   const rand = seededRandom(sch);
 
-  if (cities.length > 0 && cities.length <= MAX_LISTED_CITIES) {
-    const found = lookup(cities, b.places);
-    if (found && maxSpreadKm(found) <= MAX_CITY_SPREAD_KM) {
+  if (cityAreas) {
+    const found = cityAreas;
+    if (maxSpreadKm(found) <= MAX_CITY_SPREAD_KM) {
       const p = placeWithin(found, rand);
       if (p) return { ...p, precision: 'city', coordinatesRejected };
     }

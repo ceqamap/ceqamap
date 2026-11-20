@@ -140,8 +140,8 @@ function ProjectDetail({
       )}
       {p.location?.coordinatesRejected && (
         <p className="drawer-note muted">
-          The coordinates filed with CEQAnet fall outside the listed county, so this project is placed within its listed{' '}
-          {p.location.precision === 'city' ? 'city' : 'county'} instead.
+          The coordinates filed with CEQAnet don’t match the city or county listed for this project, so it is placed
+          within its listed {p.location.precision === 'city' ? 'city' : 'county'} instead.
         </p>
       )}
 
