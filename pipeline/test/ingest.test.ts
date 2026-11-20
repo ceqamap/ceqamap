@@ -82,7 +82,10 @@ describe('partitions', () => {
   it('round-trips through gzip NDJSON', () => {
     const docs = [doc({ key: 'b' }), doc({ key: 'a', description: 'Ünïcödé “quotes”' })];
     const back = decodePartition(encodePartition(docs));
-    assert.deepEqual(back.map((d) => d.key), ['a', 'b']);
+    assert.deepEqual(
+      back.map((d) => d.key),
+      ['a', 'b'],
+    );
     assert.equal(back[0].description, 'Ünïcödé “quotes”');
   });
 

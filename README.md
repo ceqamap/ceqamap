@@ -33,13 +33,13 @@ More detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · what the data can a
 
 ## Repository layout
 
-| Path               | What it is                                                                         |
-| ------------------ | ---------------------------------------------------------------------------------- |
-| `web/`             | The website (React, MapLibre GL, PMTiles, Vite)                                     |
-| `pipeline/`        | Data ingestion and publishing (TypeScript, runs on Node 24 with no build step)      |
-| `packages/shared/` | Types and constants both halves agree on: statuses, colors, data file shapes        |
-| `.github/`         | CI checks, the scheduled data refresh, and site deploys                             |
-| `docs/`            | Architecture, data notes, design notes, decisions                                   |
+| Path               | What it is                                                                     |
+| ------------------ | ------------------------------------------------------------------------------ |
+| `web/`             | The website (React, MapLibre GL, PMTiles, Vite)                                |
+| `pipeline/`        | Data ingestion and publishing (TypeScript, runs on Node 24 with no build step) |
+| `packages/shared/` | Types and constants both halves agree on: statuses, colors, data file shapes   |
+| `.github/`         | CI checks, the scheduled data refresh, and site deploys                        |
+| `docs/`            | Architecture, data notes, design notes, decisions                              |
 
 ## Working on it locally
 
@@ -74,17 +74,17 @@ Before pushing, run `pnpm check` (formatting, lint, types, tests). CI runs the s
    - Create an API token with the "Cloudflare Pages: Edit" permission.
 3. **GitHub repository settings → Secrets and variables → Actions**
 
-   | Kind     | Name                    | Value                                          |
-   | -------- | ----------------------- | ---------------------------------------------- |
-   | Secret   | `R2_ACCOUNT_ID`         | Cloudflare account ID                          |
-   | Secret   | `R2_ACCESS_KEY_ID`      | from the R2 token                              |
-   | Secret   | `R2_SECRET_ACCESS_KEY`  | from the R2 token                              |
-   | Secret   | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account ID                          |
-   | Secret   | `CLOUDFLARE_API_TOKEN`  | the Pages token                                |
-   | Variable | `R2_BUCKET`             | bucket name                                    |
-   | Variable | `DATA_URL`              | e.g. `https://data.example.org/data`           |
-   | Variable | `PAGES_PROJECT`         | Pages project name                             |
-   | Variable | `CEQANET_CONTACT`       | an email the State Clearinghouse can reach     |
+   | Kind     | Name                    | Value                                      |
+   | -------- | ----------------------- | ------------------------------------------ |
+   | Secret   | `R2_ACCOUNT_ID`         | Cloudflare account ID                      |
+   | Secret   | `R2_ACCESS_KEY_ID`      | from the R2 token                          |
+   | Secret   | `R2_SECRET_ACCESS_KEY`  | from the R2 token                          |
+   | Secret   | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account ID                      |
+   | Secret   | `CLOUDFLARE_API_TOKEN`  | the Pages token                            |
+   | Variable | `R2_BUCKET`             | bucket name                                |
+   | Variable | `DATA_URL`              | e.g. `https://data.example.org/data`       |
+   | Variable | `PAGES_PROJECT`         | Pages project name                         |
+   | Variable | `CEQANET_CONTACT`       | an email the State Clearinghouse can reach |
 
 4. **Load history.** Actions → Data refresh → Run workflow → mode `backfill`. About an hour for 1980 to today. It
    resumes where it left off if interrupted. After that the scheduled refresh keeps it current on its own.

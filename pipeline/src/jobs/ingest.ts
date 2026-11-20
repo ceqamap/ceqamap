@@ -35,7 +35,14 @@ for (const month of monthsBetween(start, end)) {
     await writePartition(storage, month, docs);
     anyChanged = true;
   }
-  log.info('Ingested window', { month, start: s, end: e, fetched: fetched.length, rejected: res.rejected.length, changed });
+  log.info('Ingested window', {
+    month,
+    start: s,
+    end: e,
+    fetched: fetched.length,
+    rejected: res.rejected.length,
+    changed,
+  });
 }
 
 if (process.env.GITHUB_OUTPUT) await appendFile(process.env.GITHUB_OUTPUT, `changed=${anyChanged}\n`);

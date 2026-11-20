@@ -37,13 +37,13 @@ Also observed: rapid back‑to‑back requests sometimes return an **empty** 200
 
 Each project gets the best location available, in this order:
 
-| Precision | Source                                                          | On the map           |
-| --------- | --------------------------------------------------------------- | -------------------- |
-| Exact     | Coordinates typed by the lead agency                            | Solid dot            |
-| City      | The listed city (or 2–3 nearby cities), from Census Gazetteer   | Hollow ring          |
-| County    | The listed county                                               | Hollow ring          |
-| Region    | 2–3 neighboring counties                                        | Hollow ring          |
-| None      | Statewide, or counties far apart                                | Not mapped; counted  |
+| Precision | Source                                                        | On the map          |
+| --------- | ------------------------------------------------------------- | ------------------- |
+| Exact     | Coordinates typed by the lead agency                          | Solid dot           |
+| City      | The listed city (or 2–3 nearby cities), from Census Gazetteer | Hollow ring         |
+| County    | The listed county                                             | Hollow ring         |
+| Region    | 2–3 neighboring counties                                      | Hollow ring         |
+| None      | Statewide, or counties far apart                              | Not mapped; counted |
 
 What the samples showed:
 
@@ -71,14 +71,14 @@ Ways to improve this later, roughly in order of value:
 
 CEQAnet has no status field. We infer the **stage of CEQA review** from the documents filed:
 
-| Stage          | Rule                                                                              |
-| -------------- | --------------------------------------------------------------------------------- |
-| In review      | Any document's public (or state) comment period includes today                    |
-| Approved       | Latest decisive filing is a Notice of Determination (NOD, NDE, ROD)               |
-| Exempt         | Latest decisive filing is a Notice of Exemption                                   |
-| Scoping        | Latest decisive filing is a Notice of Preparation or Intent                       |
-| Review closed  | Latest decisive filing is a draft or final environmental document, review over    |
-| Other          | Only administrative or federal notices                                            |
+| Stage         | Rule                                                                           |
+| ------------- | ------------------------------------------------------------------------------ |
+| In review     | Any document's public (or state) comment period includes today                 |
+| Approved      | Latest decisive filing is a Notice of Determination (NOD, NDE, ROD)            |
+| Exempt        | Latest decisive filing is a Notice of Exemption                                |
+| Scoping       | Latest decisive filing is a Notice of Preparation or Intent                    |
+| Review closed | Latest decisive filing is a draft or final environmental document, review over |
+| Other         | Only administrative or federal notices                                         |
 
 Honest caveats, also shown to visitors in the drawer:
 

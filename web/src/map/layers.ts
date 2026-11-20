@@ -43,10 +43,15 @@ const selected: ExpressionSpecification = ['boolean', ['feature-state', 'selecte
 /** Point radius grows gently with zoom; hover and selection enlarge it. */
 function pointRadius(base: number): ExpressionSpecification {
   return [
-    'interpolate', ['linear'], ['zoom'],
-    4, ['case', selected, base + 4, hovered, base + 2, base * 0.6],
-    10, ['case', selected, base + 5, hovered, base + 3, base],
-    15, ['case', selected, base + 7, hovered, base + 4, base * 1.8],
+    'interpolate',
+    ['linear'],
+    ['zoom'],
+    4,
+    ['case', selected, base + 4, hovered, base + 2, base * 0.6],
+    10,
+    ['case', selected, base + 5, hovered, base + 3, base],
+    15,
+    ['case', selected, base + 7, hovered, base + 4, base * 1.8],
   ] as ExpressionSpecification;
 }
 

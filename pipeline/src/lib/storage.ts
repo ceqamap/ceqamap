@@ -1,6 +1,6 @@
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
-import { AwsClient } from "aws4fetch";
+import { AwsClient } from 'aws4fetch';
 
 /**
  * Where pipeline state and published data live.
@@ -136,7 +136,12 @@ export class R2Storage implements Storage {
 }
 
 function decodeXml(s: string) {
-  return s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+  return s
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&');
 }
 
 /** Pick storage from the environment: R2 when credentials exist, else ./.data. */

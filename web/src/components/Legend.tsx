@@ -4,7 +4,9 @@ import { formatNumber } from '../lib/format.ts';
 
 export function Legend({ meta, mode }: { meta: PublishedMeta | null; mode: 'light' | 'dark' }) {
   const [open, setOpen] = useState(() => window.innerWidth >= 720);
-  const approx = meta ? meta.counts.byPrecision.city + meta.counts.byPrecision.county + meta.counts.byPrecision.region : 0;
+  const approx = meta
+    ? meta.counts.byPrecision.city + meta.counts.byPrecision.county + meta.counts.byPrecision.region
+    : 0;
 
   return (
     <section className="legend card" aria-labelledby="legend-title">

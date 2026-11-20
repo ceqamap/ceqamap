@@ -29,7 +29,12 @@ export function Controls({ basemap, onBasemap, onZoomIn, onZoomOut, onReset }: P
 
   return (
     <div className="controls" ref={panel}>
-      <button className="pill pill-outline layers-button" aria-haspopup="true" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+      <button
+        className="pill pill-outline layers-button"
+        aria-haspopup="true"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
         <LayersIcon /> {BASEMAPS.find((b) => b.id === basemap)?.label}
       </button>
       {open && (
@@ -68,7 +73,15 @@ export function Controls({ basemap, onBasemap, onZoomIn, onZoomOut, onReset }: P
 
 function LayersIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true">
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.3"
+      aria-hidden="true"
+    >
       <path d="M8 2 1.5 5.5 8 9l6.5-3.5L8 2Z" />
       <path d="m1.5 8.5 6.5 3.5 6.5-3.5" />
       <path d="m1.5 11.2 6.5 3.3 6.5-3.3" />
@@ -78,7 +91,15 @@ function LayersIcon() {
 
 function ResetIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true">
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.3"
+      aria-hidden="true"
+    >
       <circle cx="8" cy="8" r="5.5" />
       <circle cx="8" cy="8" r="1.4" fill="currentColor" stroke="none" />
       <path d="M8 0.5v2.5M8 13v2.5M0.5 8H3M13 8h2.5" />

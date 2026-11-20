@@ -10,7 +10,11 @@ interface Props {
   onLoaded: (p: PublishedProject) => void;
 }
 
-type State = { kind: 'idle' } | { kind: 'loading' } | { kind: 'error'; message: string } | { kind: 'ready'; project: PublishedProject };
+type State =
+  | { kind: 'idle' }
+  | { kind: 'loading' }
+  | { kind: 'error'; message: string }
+  | { kind: 'ready'; project: PublishedProject };
 
 const DESCRIPTION_PREVIEW = 420;
 
@@ -50,7 +54,12 @@ export function Drawer({ sch, mode, onClose, onLoaded }: Props) {
 
   const open = sch !== null;
   return (
-    <aside className={`drawer card ${open ? 'open' : ''}`} aria-hidden={!open} aria-labelledby="drawer-title" role="dialog">
+    <aside
+      className={`drawer card ${open ? 'open' : ''}`}
+      aria-hidden={!open}
+      aria-labelledby="drawer-title"
+      role="dialog"
+    >
       {open && (
         <>
           <div className="drawer-bar">

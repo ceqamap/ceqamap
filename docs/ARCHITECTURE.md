@@ -9,15 +9,15 @@
 
 ## Decisions
 
-| Decision | Choice | Why | Rejected |
-| --- | --- | --- | --- |
-| Serving model | Static files on a CDN | Nothing to scale, patch, or wake up at 3 a.m. for; a traffic spike is free | API server + Postgres/PostGIS: real ops burden for no visible gain until we need search/filters |
-| Map library | MapLibre GL JS | The leading open‑source WebGL map renderer; vector and raster basemaps; smooth zoom | Leaflet (raster‑first, struggles with 300k points), Mapbox GL (proprietary license, metered) |
-| Point delivery | Vector tiles in one PMTiles file, clustered by tippecanoe | The browser downloads only what is on screen; clustering is precomputed and consistent at every zoom | One big GeoJSON clustered in the browser: tens of MB up front, slow on phones |
-| Hosting | Cloudflare Pages (site) + R2 (data) | Free tiers cover this comfortably; R2 has no egress fees; PMTiles works over plain HTTP range requests | Vercel + S3 (egress fees), GitHub Pages (no custom headers, no range‑request guarantees) |
-| Scheduler | GitHub Actions cron | Already where the code lives; logs and failure alerts built in | A separate cron service or server |
-| Language | TypeScript everywhere | One language for site and pipeline; types shared between them | Python pipeline + TS site: two toolchains for one small team |
-| Pipeline runtime | Node 24, native TypeScript | No build step for the pipeline | ts-node/tsx, bundling |
+| Decision         | Choice                                                    | Why                                                                                                    | Rejected                                                                                        |
+| ---------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| Serving model    | Static files on a CDN                                     | Nothing to scale, patch, or wake up at 3 a.m. for; a traffic spike is free                             | API server + Postgres/PostGIS: real ops burden for no visible gain until we need search/filters |
+| Map library      | MapLibre GL JS                                            | The leading open‑source WebGL map renderer; vector and raster basemaps; smooth zoom                    | Leaflet (raster‑first, struggles with 300k points), Mapbox GL (proprietary license, metered)    |
+| Point delivery   | Vector tiles in one PMTiles file, clustered by tippecanoe | The browser downloads only what is on screen; clustering is precomputed and consistent at every zoom   | One big GeoJSON clustered in the browser: tens of MB up front, slow on phones                   |
+| Hosting          | Cloudflare Pages (site) + R2 (data)                       | Free tiers cover this comfortably; R2 has no egress fees; PMTiles works over plain HTTP range requests | Vercel + S3 (egress fees), GitHub Pages (no custom headers, no range‑request guarantees)        |
+| Scheduler        | GitHub Actions cron                                       | Already where the code lives; logs and failure alerts built in                                         | A separate cron service or server                                                               |
+| Language         | TypeScript everywhere                                     | One language for site and pipeline; types shared between them                                          | Python pipeline + TS site: two toolchains for one small team                                    |
+| Pipeline runtime | Node 24, native TypeScript                                | No build step for the pipeline                                                                         | ts-node/tsx, bundling                                                                           |
 
 ## Data flow
 
@@ -47,9 +47,9 @@
 
 ## Dependencies we do not control
 
-| Dependency | Risk | Mitigation |
-| --- | --- | --- |
-| CEQAnet CSV export | Undocumented; could change or block automated access | Fail loudly on schema change; site keeps last good build; identify ourselves in User‑Agent; ask the State Clearinghouse for an official feed |
-| OpenFreeMap basemaps | Free public service, no SLA | Fallback blank style already keeps data visible; next step is self‑hosting a California Protomaps extract on R2 |
-| USGS National Map tiles | Government service, occasional outages | Other basemaps remain available |
-| GitHub Actions IPs | CEQAnet could block cloud IP ranges | Move the fetch to a Cloudflare Worker cron or a small VM if it happens |
+| Dependency              | Risk                                                 | Mitigation                                                                                                                                   |
+| ----------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| CEQAnet CSV export      | Undocumented; could change or block automated access | Fail loudly on schema change; site keeps last good build; identify ourselves in User‑Agent; ask the State Clearinghouse for an official feed |
+| OpenFreeMap basemaps    | Free public service, no SLA                          | Fallback blank style already keeps data visible; next step is self‑hosting a California Protomaps extract on R2                              |
+| USGS National Map tiles | Government service, occasional outages               | Other basemaps remain available                                                                                                              |
+| GitHub Actions IPs      | CEQAnet could block cloud IP ranges                  | Move the fetch to a Cloudflare Worker cron or a small VM if it happens                                                                       |

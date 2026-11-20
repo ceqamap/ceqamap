@@ -29,8 +29,28 @@ const EXEMPTION = new Set(['NOE']);
 const SCOPING = new Set(['NOP', 'NOI']);
 /** Documents that circulate for review or finalize review. */
 const ENVIRONMENTAL = new Set([
-  'EIR', 'MND', 'NEG', 'FIN', 'SIR', 'SBE', 'RIR', 'REV', 'MEA', 'SCA', 'EA', 'EIS', 'FIS',
-  'SEA', 'SIS', 'JD', 'FON', 'RC', 'ADM', 'NOC', 'BLA', 'RAN',
+  'EIR',
+  'MND',
+  'NEG',
+  'FIN',
+  'SIR',
+  'SBE',
+  'RIR',
+  'REV',
+  'MEA',
+  'SCA',
+  'EA',
+  'EIS',
+  'FIS',
+  'SEA',
+  'SIS',
+  'JD',
+  'FON',
+  'RC',
+  'ADM',
+  'NOC',
+  'BLA',
+  'RAN',
 ]);
 
 export interface StatusResult {

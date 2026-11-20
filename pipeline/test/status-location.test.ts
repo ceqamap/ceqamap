@@ -124,11 +124,7 @@ describe('gazetteer', () => {
 
 describe('resolveLocation', () => {
   it('prefers typed coordinates from the newest document', () => {
-    const r = resolveLocation(
-      'x',
-      [doc({ coordinates: `40°34'57"N 122°23'47"W`, cities: ['Redding'] })],
-      GAZ,
-    );
+    const r = resolveLocation('x', [doc({ coordinates: `40°34'57"N 122°23'47"W`, cities: ['Redding'] })], GAZ);
     assert.equal(r?.precision, 'exact');
   });
 
@@ -195,7 +191,12 @@ describe('aggregate', () => {
         description: 'Demolish the old courthouse.',
         cities: ['Redding'],
       }),
-      doc({ sch: '2026110466', type: 'NOE', received: '2026-11-17', counties: ['Kern', 'Tulare', 'Shasta', 'Del Norte'] }),
+      doc({
+        sch: '2026110466',
+        type: 'NOE',
+        received: '2026-11-17',
+        counties: ['Kern', 'Tulare', 'Shasta', 'Del Norte'],
+      }),
     ];
     const r = aggregate(docs, GAZ, TODAY, '2026-11-18T00:00:00Z');
     assert.equal(r.counts.projects, 2);
@@ -209,7 +210,10 @@ describe('aggregate', () => {
     const p = r.projects.find((x) => x.sch === '2025100575')!;
     assert.equal(p.description, 'Demolish the old courthouse.');
     assert.equal(p.reviewEnd, '2026-12-18');
-    assert.deepEqual(p.documents.map((d) => d.type), ['EIR', 'NOP']);
+    assert.deepEqual(
+      p.documents.map((d) => d.type),
+      ['EIR', 'NOP'],
+    );
     assert.equal(r.points[0].properties.r, 1);
     assert.equal(r.points[0].properties.x, 0);
   });

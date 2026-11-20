@@ -20,7 +20,13 @@ describe('paperify', () => {
       sources: {},
       layers: [
         { id: 'background', type: 'background', paint: { 'background-color': '#fff' } },
-        { id: 'water', type: 'fill', source: 'x', 'source-layer': 'water', paint: { 'fill-color': '#00f', 'fill-pattern': 'p' } },
+        {
+          id: 'water',
+          type: 'fill',
+          source: 'x',
+          'source-layer': 'water',
+          paint: { 'fill-color': '#00f', 'fill-pattern': 'p' },
+        },
         { id: 'poi_r1', type: 'symbol', source: 'x', 'source-layer': 'poi' },
         { id: 'mystery', type: 'circle', source: 'x', paint: { 'circle-color': '#f00' } },
       ],

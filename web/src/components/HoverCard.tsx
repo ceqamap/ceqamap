@@ -36,7 +36,11 @@ export function HoverCard({ info, mode }: { info: HoverInfo | null; mode: 'light
     <div className="hover-card card" style={style} role="tooltip">
       <p className="hover-title">{info.props.t}</p>
       <p className="hover-meta">
-        <span className={`dot ${info.props.x ? '' : 'ring-only'}`} style={{ background: status[mode], borderColor: status[mode] }} aria-hidden="true" />
+        <span
+          className={`dot ${info.props.x ? '' : 'ring-only'}`}
+          style={{ background: status[mode], borderColor: status[mode] }}
+          aria-hidden="true"
+        />
         {status.label}
         {info.props.x ? '' : ' · approximate location'}
       </p>

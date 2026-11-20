@@ -120,7 +120,12 @@ function round6(n: number): number {
   return Math.round(n * 1e6) / 1e6;
 }
 
-export function aggregate(docs: Iterable<CeqaDocument>, gaz: Gazetteer, today: string, builtAt: string): AggregateResult {
+export function aggregate(
+  docs: Iterable<CeqaDocument>,
+  gaz: Gazetteer,
+  today: string,
+  builtAt: string,
+): AggregateResult {
   const groups = groupBySch(docs);
   const projects: PublishedProject[] = [];
   const points: PointFeature[] = [];

@@ -108,11 +108,13 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       map.on('style.load', () => addDataLayers(map!));
       map.on('error', (e) => {
         // Missing tiles at the edges are normal; only surface source failures.
-        if ((e as { sourceId?: string }).sourceId === SOURCE_ID) latest.current.onError('Some map data failed to load.');
+        if ((e as { sourceId?: string }).sourceId === SOURCE_ID)
+          latest.current.onError('Some map data failed to load.');
       });
 
       map.on('mousemove', (e) => {
-        const f = map!.queryRenderedFeatures(e.point, { layers: INTERACTIVE_LAYERS })[0] as MapGeoJSONFeature | undefined;
+        const f = map!.queryRenderedFeatures(e.point, { layers: INTERACTIVE_LAYERS })[0] as
+          MapGeoJSONFeature | undefined;
         setHovered(map!, f && !f.properties.point_count ? String(f.properties.id) : null);
         map!.getCanvas().style.cursor = f ? 'pointer' : '';
         if (!f) return latest.current.onHover(null);
@@ -125,7 +127,12 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
             inReview: Number(f.properties.r ?? 0),
           });
         } else {
-          latest.current.onHover({ kind: 'point', x: e.point.x, y: e.point.y, props: f.properties as TilePointProperties });
+          latest.current.onHover({
+            kind: 'point',
+            x: e.point.x,
+            y: e.point.y,
+            props: f.properties as TilePointProperties,
+          });
         }
       });
       map.getCanvas().addEventListener('mouseleave', () => {
@@ -134,11 +141,16 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       });
 
       map.on('click', (e) => {
-        const f = map!.queryRenderedFeatures(e.point, { layers: INTERACTIVE_LAYERS })[0] as MapGeoJSONFeature | undefined;
+        const f = map!.queryRenderedFeatures(e.point, { layers: INTERACTIVE_LAYERS })[0] as
+          MapGeoJSONFeature | undefined;
         if (!f) return latest.current.onSelect(null);
         if (f.properties.point_count) {
           const [lon, lat] = (f.geometry as GeoJSON.Point).coordinates;
-          map!.easeTo({ center: [lon, lat], zoom: Math.min(map!.getZoom() + 2, 14), duration: prefersReducedMotion() ? 0 : 600 });
+          map!.easeTo({
+            center: [lon, lat],
+            zoom: Math.min(map!.getZoom() + 2, 14),
+            duration: prefersReducedMotion() ? 0 : 600,
+          });
         } else {
           latest.current.onSelect(String(f.properties.id));
         }
