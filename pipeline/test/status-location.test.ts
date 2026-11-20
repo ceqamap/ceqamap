@@ -106,7 +106,11 @@ const B: Boundaries = {
     anderson: area('Anderson', rect(-122.33, 40.43, -122.27, 40.47)),
     'los angeles': area('Los Angeles', rect(-118.6, 33.75, -118.15, 34.3)),
     // Mainland plus a tiny island 40 km offshore, like San Francisco and the Farallones.
-    'san francisco': area('San Francisco', rect(-122.51, 37.71, -122.36, 37.81), rect(-123.005, 37.695, -122.995, 37.705)),
+    'san francisco': area(
+      'San Francisco',
+      rect(-122.51, 37.71, -122.36, 37.81),
+      rect(-123.005, 37.695, -122.995, 37.705),
+    ),
   },
   counties: {
     shasta: area('Shasta', rect(-123.07, 40.29, -121.32, 41.19)),
@@ -114,7 +118,11 @@ const B: Boundaries = {
     tulare: area('Tulare', rect(-119.57, 35.79, -117.98, 36.75)),
     'del norte': area('Del Norte', rect(-124.25, 41.46, -123.52, 42.0)),
     mendocino: area('Mendocino', rect(-123.85, 38.76, -122.82, 40.0)),
-    'san francisco': area('San Francisco', rect(-122.51, 37.71, -122.36, 37.81), rect(-123.005, 37.695, -122.995, 37.705)),
+    'san francisco': area(
+      'San Francisco',
+      rect(-122.51, 37.71, -122.36, 37.81),
+      rect(-123.005, 37.695, -122.995, 37.705),
+    ),
   },
 };
 
