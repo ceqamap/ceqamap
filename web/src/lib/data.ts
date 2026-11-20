@@ -17,6 +17,15 @@ const PREVIEW_REF = import.meta.env.VITE_PREVIEW_REF as string | undefined;
 
 /** The data origin in use; switches to preview data when it matches. */
 let activeBase = DATA_URL;
+/**
+ * Resolves once the first meta check has picked the data origin. Project
+ * fetches wait on it; otherwise a shared link could load the drawer from the
+ * wrong origin before the check finishes (seen on the preview, 2026-11-20).
+ */
+let markBaseChosen: () => void = () => {};
+const baseChosen = new Promise<void>((resolve) => {
+  markBaseChosen = resolve;
+});
 
 export const META_POLL_MS = 5 * 60_000;
 /** Poll faster while no data has been published yet, so it appears promptly. */
@@ -53,9 +62,11 @@ export async function fetchMeta(signal?: AbortSignal): Promise<PublishedMeta> {
   const preview = await previewMeta(signal);
   if (preview) {
     activeBase = PREVIEW_DATA_URL!;
+    markBaseChosen();
     return preview;
   }
   activeBase = DATA_URL;
+  markBaseChosen();
   // `no-cache` revalidates with the CDN each time; meta.json is tiny.
   const res = await fetch(absoluteDataUrl('meta.json'), { cache: 'no-cache', signal }).catch(() => {
     throw new DataStatusError('unreachable', 'Can’t reach the map data right now. Retrying shortly.');
@@ -71,7 +82,7 @@ export function fetchProject(sch: string): Promise<PublishedProject> {
   if (!/^\d{10}$/.test(sch)) return Promise.reject(new Error('Invalid SCH number'));
   let p = projectCache.get(sch);
   if (!p) {
-    p = fetch(absoluteDataUrl(`projects/${sch}.json`)).then(async (res) => {
+    p = baseChosen.then(() => fetch(absoluteDataUrl(`projects/${sch}.json`))).then(async (res) => {
       if (!res.ok) throw new Error(res.status === 404 ? 'Project not found' : `Could not load project (${res.status})`);
       return (await res.json()) as PublishedProject;
     });
