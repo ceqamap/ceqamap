@@ -30,7 +30,9 @@ jobs:
         id: install
         run: |
           if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; else pnpm install; fi
-      - run: pnpm format:check
+      - name: Check formatting
+        # On failure, print the exact changes Prettier wants so they're easy to apply.
+        run: pnpm format:check || (pnpm format > /dev/null && git --no-pager diff && exit 1)
       - run: pnpm lint
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
       - run: pnpm typecheck

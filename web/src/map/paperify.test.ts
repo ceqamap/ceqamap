@@ -38,7 +38,7 @@ describe('paperify', () => {
     assert.equal(by.background.paint['background-color'], PALETTES.paper.background);
     assert.equal(by.water.paint['fill-color'], PALETTES.paper.water);
     assert.equal(by.water.paint['fill-pattern'], undefined);
-    assert.equal(by.poi_r1.layout.visibility, 'none');
+    assert.equal(by.poi_r1.layout?.visibility, 'none');
     assert.equal(by.mystery.paint['circle-color'], '#f00');
   });
 
