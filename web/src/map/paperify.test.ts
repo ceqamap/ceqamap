@@ -57,7 +57,10 @@ describe('paperify', () => {
       ],
     } as unknown as StyleSpecification;
     const out = labelOverlay(style) as unknown as (Layer & { id: string })[];
-    assert.deepEqual(out.map((l) => l.id), ['labels-highway_motorway', 'labels-boundary_state', 'labels-place_city']);
+    assert.deepEqual(
+      out.map((l) => l.id),
+      ['labels-highway_motorway', 'labels-boundary_state', 'labels-place_city'],
+    );
     assert.equal(out[2].paint['text-color'], '#ffffff');
     assert.equal(out[2].layout?.['icon-image'], undefined);
     assert.equal(out[0].paint['line-width'], 2);
