@@ -128,6 +128,12 @@ export async function geocodeAll(
   }
   return {
     results,
-    stats: { queries: queries.length, newlySent: sent, failed, deferred: pending.size - todo.length, found: results.size },
+    stats: {
+      queries: queries.length,
+      newlySent: sent,
+      failed,
+      deferred: pending.size - todo.length,
+      found: results.size,
+    },
   };
 }

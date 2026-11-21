@@ -55,5 +55,8 @@ const nCounties = Object.keys(b.counties).length;
 if (nPlaces < 1000 || nCounties !== 58) throw new Error(`Unexpected counts: ${nPlaces} places, ${nCounties} counties`);
 
 await mkdir(new URL('../data/', import.meta.url), { recursive: true });
-await writeFile(new URL('../data/boundaries.json', import.meta.url), JSON.stringify({ ...b, vintage: VINTAGE, zipVintage: zctaVintage }));
+await writeFile(
+  new URL('../data/boundaries.json', import.meta.url),
+  JSON.stringify({ ...b, vintage: VINTAGE, zipVintage: zctaVintage }),
+);
 console.log(`Wrote ${nPlaces} places, ${nCounties} counties and ${nZips} ZIP areas (ZCTA ${zctaVintage})`);

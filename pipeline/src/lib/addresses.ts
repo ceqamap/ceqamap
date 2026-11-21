@@ -26,7 +26,11 @@ export interface AddressRequest {
 }
 
 /** The address to geocode for a project, or null if there's none (or no city or ZIP to pair it with). */
-export function addressRequest(sch: string, newestFirst: readonly CeqaDocument[], b: Boundaries): AddressRequest | null {
+export function addressRequest(
+  sch: string,
+  newestFirst: readonly CeqaDocument[],
+  b: Boundaries,
+): AddressRequest | null {
   let street: string | null = null;
   for (const field of FIELDS) {
     for (const d of newestFirst) {

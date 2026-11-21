@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { type LocationPrecision, PRECISION_LABEL, type PublishedProject, STATUS_BY_ID } from '../../../packages/shared/src/index.ts';
+import {
+  type LocationPrecision,
+  PRECISION_LABEL,
+  type PublishedProject,
+  STATUS_BY_ID,
+} from '../../../packages/shared/src/index.ts';
 import { fetchProject } from '../lib/data.ts';
 import { formatDate, formatNumber, placeLine, reviewCountdown, splitFacts, todayInCalifornia } from '../lib/format.ts';
 
