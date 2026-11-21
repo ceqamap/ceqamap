@@ -211,7 +211,7 @@ export function streetKeys(name: string): StreetKeys | null {
 const VAGUE =
   /\b(various|multiple|several|numerous|n\/?a|none|unknown|see (attached|map|below|above)|throughout|countywide|citywide|statewide|regionwide|tbd|not applicable)\b/i;
 const FILLER =
-  /\b(intersection of|corner of|(?:north|south|east|west|n|s|e|w)\s+of|near|adjacent to|between|along|located (?:at|on)|at the|the)\b/gi;
+  /\b((?:(?:north|south|east|west)(?:ern|erly)?\s+)?(?:end|terminus|portion|segment|side|edge)\s+of|intersection of|corner of|(?:north|south|east|west|n|s|e|w)\s+of|near|adjacent to|between|along|located (?:at|on)|at the|the)\b/gi;
 
 /**
  * Pull up to four street names out of a "Cross Streets" field. Returns []

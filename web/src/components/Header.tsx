@@ -43,7 +43,12 @@ export function Header({ meta, status, scope, stages, onScope, arrivalIndex, onN
   return (
     <header className="header card">
       <h1 className="wordmark">CEQA Map</h1>
-      <p className="header-sub">Every project filed with California’s State Clearinghouse, on one map.</p>
+      <p className="header-sub">
+        {/* Two deliberate lines, so the card can shrink to fit them (see .header). */}
+        Every project filed with California’s
+        <br />
+        State Clearinghouse, on one map.
+      </p>
       <div className="live" aria-live="polite">
         {status && !meta ? (
           <>
@@ -86,9 +91,9 @@ export function Header({ meta, status, scope, stages, onScope, arrivalIndex, onN
                           </option>
                         ))}
                       </select>
-                      <span className="scope-chevron" aria-hidden="true">
-                        ▾
-                      </span>
+                      <svg className="scope-chevron" width="8" height="5" viewBox="0 0 8 5" aria-hidden="true">
+                        <path d="M0.75 0.75 4 4 7.25 0.75" fill="none" stroke="currentColor" strokeWidth="1.25" />
+                      </svg>
                     </label>
                   </>
                 )}

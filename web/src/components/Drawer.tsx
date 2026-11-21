@@ -6,7 +6,15 @@ import {
   STATUS_BY_ID,
 } from '../../../packages/shared/src/index.ts';
 import { fetchProject } from '../lib/data.ts';
-import { formatDate, formatNumber, placeLine, reviewCountdown, splitFacts, todayInCalifornia } from '../lib/format.ts';
+import {
+  factTag,
+  formatDate,
+  formatNumber,
+  placeLine,
+  reviewCountdown,
+  splitFacts,
+  todayInCalifornia,
+} from '../lib/format.ts';
 
 interface Props {
   sch: string | null;
@@ -27,7 +35,9 @@ const FALLBACK_PHRASE: Record<LocationPrecision, string> = {
   exact: 'at its coordinates',
   address: 'at the street address in its description',
   intersection: 'near its listed cross streets',
+  landmark: 'at a place named in its description',
   street: 'along its listed street',
+  community: 'at a community named in its description',
   zip: 'within its listed ZIP code',
   city: 'within its listed city',
   county: 'within its listed county',
@@ -40,8 +50,12 @@ export function Drawer({ sch, mode, onClose, onLoaded }: Props) {
   const onLoadedRef = useRef(onLoaded);
   onLoadedRef.current = onLoaded;
 
+  // Keep showing the last project while the drawer slides closed, instead of
+  // emptying it first.
+  const [shownSch, setShownSch] = useState(sch);
   useEffect(() => {
-    if (!sch) return setState({ kind: 'idle' });
+    if (!sch) return;
+    setShownSch(sch);
     let live = true;
     setState({ kind: 'loading' });
     fetchProject(sch).then(
@@ -73,13 +87,14 @@ export function Drawer({ sch, mode, onClose, onLoaded }: Props) {
     <aside
       className={`drawer card ${open ? 'open' : ''}`}
       aria-hidden={!open}
+      inert={!open}
       aria-labelledby="drawer-title"
       role="dialog"
     >
-      {open && (
+      {shownSch && (
         <>
           <div className="drawer-bar">
-            <span className="eyebrow">SCH {sch}</span>
+            <span className="eyebrow">SCH {shownSch}</span>
             <button className="icon-button" onClick={onClose} aria-label="Close project details">
               ✕
             </button>
@@ -157,6 +172,7 @@ function ProjectDetail({
               {PRECISION_LABEL[p.location.precision]}
               {p.location.streets && ` (${p.location.streets.join(' and ')})`}
               {p.location.address && ` (${p.location.address})`}
+              {p.location.landmark && ` (${p.location.landmark})`}
               {p.location.precision === 'zip' && p.location.zip && ` (${p.location.zip})`}
             </span>
           )}
@@ -197,7 +213,7 @@ function ProjectDetail({
                   <dd>
                     <ul className="tags">
                       {v.map((t) => (
-                        <li key={t}>{t}</li>
+                        <Tag key={t} text={t} />
                       ))}
                     </ul>
                   </dd>
@@ -248,6 +264,26 @@ function ProjectDetail({
         clerk, so “Review closed” projects may already be approved.
       </p>
     </article>
+  );
+}
+
+/**
+ * One fact as a tag. Long CEQAnet entries ("Commercial (Commercial Uses and
+ * Employees not defined at this time)(Sq. Ft. 27000, Acres 0.62, Employees
+ * 25)") show the category plus its numbers on one line, cut with an ellipsis
+ * if still too long; click to read the whole entry.
+ */
+function Tag({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const { label, detail, full } = factTag(text);
+  if (!detail) return <li className="tag">{label}</li>;
+  return (
+    <li className={`tag has-detail ${open ? 'open' : ''}`}>
+      <button type="button" aria-expanded={open} title={open ? undefined : full} onClick={() => setOpen((o) => !o)}>
+        <span className="tag-label">{label}</span>
+        <span className="tag-detail">{open ? full.slice(label.length).trim() : detail}</span>
+      </button>
+    </li>
   );
 }
 

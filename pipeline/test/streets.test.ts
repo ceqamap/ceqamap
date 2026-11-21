@@ -47,6 +47,13 @@ describe('parseCrossStreets', () => {
     assert.deepEqual(parseCrossStreets('Hwy 101 & Old Redwood Highway'), ['Hwy 101', 'Old Redwood Highway']);
     assert.deepEqual(parseCrossStreets('Intersection of N. First St. and Elm Ave'), ['N. First St.', 'Elm Ave']);
     assert.deepEqual(parseCrossStreets('Elm Ave between 3rd St and 5th St'), ['Elm Ave', '3rd St', '5th St']);
+    // SCH 2026060142, Banning: the street was lost behind "Northern end of".
+    assert.deepEqual(parseCrossStreets('Northern end of Nicolet Avenue, between Almond Way and North Cherry Street'), [
+      'Nicolet Avenue',
+      'Almond Way',
+      'North Cherry Street',
+    ]);
+    assert.deepEqual(parseCrossStreets('Western portion of Main St at 5th St'), ['Main St', '5th St']);
   });
   it('returns nothing for vague or single-street entries', () => {
     assert.deepEqual(parseCrossStreets('Various'), []);

@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { daysUntil, formatDate, placeLine, reviewCountdown, splitFacts, timeAgo, todayInCalifornia } from './format.ts';
+import {
+  daysUntil,
+  factTag,
+  formatDate,
+  placeLine,
+  reviewCountdown,
+  splitFacts,
+  timeAgo,
+  todayInCalifornia,
+} from './format.ts';
 
 describe('format', () => {
   it('formats ISO dates without timezone drift', () => {
@@ -35,5 +44,27 @@ describe('format', () => {
       'Other (Courthouse, Demolition)',
       'Redevelopment',
     ]);
+  });
+});
+
+describe('factTag', () => {
+  it('turns key numbers into a short detail', () => {
+    assert.deepEqual(factTag('Residential (Units 2750, Acres 424)'), {
+      label: 'Residential',
+      detail: '2,750 units · 424 acres',
+      full: 'Residential (Units 2750, Acres 424)',
+    });
+    assert.equal(
+      factTag(
+        'Commercial (Commercial Uses and Employees not defined at this time)(Sq. Ft. 27000, Acres 0.62, Employees 25)',
+      ).detail,
+      '27,000 sq ft · 0.62 acres · 25 employees',
+    );
+    assert.equal(factTag('Power (Type Solar, Megawatts 50)').detail, 'Solar · 50 MW');
+  });
+
+  it('keeps free text as the detail, and plain entries as they are', () => {
+    assert.equal(factTag('Educational (10 Acre Elementary School Site)').detail, '10 Acre Elementary School Site');
+    assert.deepEqual(factTag('Aesthetics'), { label: 'Aesthetics', detail: '', full: 'Aesthetics' });
   });
 });

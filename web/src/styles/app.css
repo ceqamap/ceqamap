@@ -143,7 +143,9 @@ a {
   left: var(--gutter);
   z-index: 2;
   padding: 16px 20px 14px;
-  max-width: 360px;
+  /* Same width as the map key below it; the subtitle's two lines fit it. */
+  width: var(--panel-width);
+  max-width: calc(100vw - var(--gutter) * 2 - 64px);
 }
 
 .wordmark {
@@ -189,7 +191,6 @@ a {
 .live-dot {
   position: relative;
   flex: none;
-  margin-top: 6px; /* centered on the first line of text */
   width: 7px;
   height: 7px;
   border-radius: 50%;
@@ -205,6 +206,9 @@ a {
   animation: ping 2.4s var(--ease) var(--ping-delay, 0s) infinite;
 }
 
+.live > .live-dot {
+  margin-top: 6px; /* centered on the header's first line of text */
+}
 .live-text {
   display: flex;
   flex-direction: column;
@@ -235,7 +239,7 @@ a {
 .scope-select select {
   appearance: none;
   margin: 0;
-  padding: 0 13px 0 0;
+  padding: 0 13px 0 0; /* 8px chevron + 5px gap */
   border: 0;
   background: none;
   font: inherit;
@@ -253,9 +257,15 @@ a {
 .scope-chevron {
   position: absolute;
   right: 0;
+  top: 50%;
+  margin-top: -1.5px; /* centered on the lowercase letters, not the line box */
   pointer-events: none;
-  font-size: 10px;
   color: var(--muted);
+  transition: color 0.2s var(--ease);
+}
+.scope-select:hover .scope-chevron,
+.scope-select:focus-within .scope-chevron {
+  color: var(--ink);
 }
 @keyframes ping {
   from {
@@ -279,10 +289,12 @@ a {
   flex-direction: column;
   align-items: flex-end;
   gap: 10px;
-  transition: right 0.35s var(--ease);
+  /* Moves with the drawer: same distance, duration and easing (see .drawer). */
+  transition: transform var(--drawer-out);
 }
 .drawer-open .controls {
-  right: calc(var(--drawer-width) + var(--gutter) * 2);
+  transform: translateX(calc(-1 * (var(--drawer-width) + var(--gutter))));
+  transition: transform var(--drawer-in);
 }
 
 .pill {
@@ -325,11 +337,41 @@ a {
   box-shadow: var(--shadow-card);
 }
 
+/* Opens like the map key: height (0fr <-> 1fr) and a fade. While closed the
+   card is hidden and its negative margin cancels the column gap, so the zoom
+   controls don't move; opening slides them down. */
 .basemap-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  min-width: 200px;
+  margin-top: -12px; /* the 10px gap plus the closed card's 2px of border */
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    grid-template-rows 320ms var(--ease),
+    margin-top 320ms var(--ease),
+    opacity 160ms ease,
+    visibility 0s linear 320ms;
+}
+.basemap-panel.open {
+  grid-template-rows: 1fr;
+  margin-top: 0;
+  opacity: 1;
+  visibility: visible;
+  transition:
+    grid-template-rows 320ms var(--ease),
+    margin-top 320ms var(--ease),
+    opacity 240ms ease 80ms,
+    visibility 0s;
+}
+.basemap-clip {
+  min-height: 0;
+  overflow: hidden;
+}
+.basemap-list {
   display: flex;
   flex-direction: column;
   padding: 6px;
-  min-width: 200px;
 }
 .basemap-option {
   display: flex;
@@ -370,19 +412,23 @@ a {
   border-radius: var(--radius-pill);
   padding: 2px;
 }
-.zoom-group button {
+/* Round icon button with a quiet paper hover: map zoom controls, legend toggle.
+   (The drawer's outlined close button is .icon-button.) */
+.map-button {
   display: grid;
+  flex: none;
   place-items: center;
   width: 36px;
   height: 36px;
+  padding: 0;
   border: 0;
   border-radius: 50%;
   background: transparent;
   font-size: 18px;
   line-height: 1;
 }
-.zoom-group button:hover {
-  background: var(--paper);
+.map-button:hover {
+  background: var(--paper); /* same as the map layer menu's items */
 }
 
 /* --------------------------------------------------------------- legend */
@@ -390,22 +436,54 @@ a {
 .legend {
   position: absolute;
   left: var(--gutter);
-  bottom: calc(var(--gutter) + 18px);
+  bottom: var(--gutter); /* level with the project drawer's bottom edge */
   z-index: 2;
-  width: 264px;
-  padding: 12px 16px;
+  width: var(--panel-width);
+  /* Same 2px inset as the zoom controls, so the header button lines up with them. */
+  padding: 2px;
 }
-.legend-toggle {
+/* Collapsed: a pill as tall as the zoom controls are wide (36px button + 2px
+   inset + border). The radius is half that height, not 999px, so it eases
+   smoothly to and from the card radius. */
+.legend {
+  transition: border-radius 320ms var(--ease);
+}
+.legend.collapsed {
+  border-radius: 21px;
+}
+/* Expand and collapse: animate the body's height (0fr <-> 1fr) and fade it. */
+.legend-reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 320ms var(--ease),
+    opacity 160ms ease;
+}
+.legend.open .legend-reveal {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition:
+    grid-template-rows 320ms var(--ease),
+    opacity 240ms ease 80ms;
+}
+.legend-clip {
+  min-height: 0;
+  overflow: hidden;
+}
+.legend-head {
   display: flex;
-  width: 100%;
-  justify-content: space-between;
   align-items: center;
-  padding: 0;
-  border: 0;
-  background: none;
+  justify-content: space-between;
+  gap: 12px;
+  padding-left: 14px;
 }
-.chevron {
-  color: var(--muted);
+.legend-head .eyebrow {
+  cursor: pointer;
+  user-select: none;
+}
+.legend-body {
+  padding: 0 14px 10px;
 }
 .legend hr {
   border: 0;
@@ -414,7 +492,7 @@ a {
 }
 .legend-list {
   list-style: none;
-  margin: 10px 0 0;
+  margin: 4px 0 0;
   padding: 0;
   display: grid;
   gap: 5px;
@@ -428,18 +506,18 @@ a {
 }
 .stage-toggle {
   display: flex;
-  width: calc(100% + 12px);
+  width: calc(100% + 16px);
   align-items: center;
   gap: 10px;
-  margin: 0 -6px;
-  padding: 2px 6px;
+  margin: 0 -8px;
+  padding: 2px 8px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-pill);
   background: none;
   text-align: left;
 }
 .stage-toggle:hover {
-  background: var(--line);
+  background: var(--paper);
 }
 .stage-toggle.off .legend-label,
 .stage-toggle.off .legend-count {
@@ -563,12 +641,20 @@ a {
   background: var(--card);
   backdrop-filter: none;
   transform: translateX(calc(100% + var(--gutter) * 2));
-  transition: transform 0.4s var(--ease);
+  /* Closing: a quicker ease-in, then hide (visibility waits for the slide, so
+     it no longer vanishes before moving). Opening: a longer ease-out. */
+  transition:
+    transform var(--drawer-out),
+    visibility 0s linear var(--drawer-out-ms);
   visibility: hidden;
+  will-change: transform;
 }
 .drawer.open {
   transform: none;
   visibility: visible;
+  transition:
+    transform var(--drawer-in),
+    visibility 0s;
 }
 
 .drawer-bar {
@@ -674,7 +760,8 @@ a {
 }
 .facts div {
   display: grid;
-  grid-template-columns: 112px 1fr;
+  /* minmax(0, …): one-line tags must shrink to the drawer, not widen it. */
+  grid-template-columns: 112px minmax(0, 1fr);
   gap: 12px;
 }
 .facts dt {
@@ -682,6 +769,7 @@ a {
   color: var(--muted);
 }
 .facts dd {
+  min-width: 0;
   margin: 0;
   font-size: 14px;
 }
@@ -693,12 +781,57 @@ a {
   padding: 0;
   list-style: none;
 }
-.tags li {
+.tags .tag {
+  max-width: 100%;
+  min-width: 0;
   padding: 2px 10px;
   border: 1px solid var(--line);
   border-radius: var(--radius-pill);
   font-size: 12.5px;
   background: var(--paper);
+}
+/* Entries with numbers or notes: one line, category first, detail muted and
+   cut with an ellipsis; click to show the whole entry. */
+.tags .tag.has-detail {
+  padding: 0;
+}
+.tag.has-detail button {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  max-width: 100%;
+  padding: 2px 10px;
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+}
+.tag.has-detail button:hover {
+  background: var(--line);
+}
+.tag-label {
+  flex: none;
+}
+.tag-detail {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--muted);
+}
+.tag.open {
+  border-radius: 12px;
+}
+.tag.open button {
+  display: block;
+  white-space: normal;
+}
+.tag.open .tag-detail {
+  overflow: visible;
+}
+.tag.open .tag-label::after {
+  content: ' ';
 }
 
 /* Filing timeline: nodes on a hairline, like the reference's graph. */
@@ -791,7 +924,126 @@ a {
   font-size: 11px;
 }
 .maplibregl-ctrl-bottom-right {
-  margin: 0 14px 14px 0;
+  margin: 0 var(--gutter) var(--gutter) 0;
+}
+/* Attribution as a pill like the map layer button: 38px tall with its border,
+   the info icon a 36px round button at its right end. Expanded, the credits
+   sit inside the same pill. */
+.maplibregl-ctrl.maplibregl-ctrl-attrib.maplibregl-compact {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  min-height: 38px;
+  margin: 0;
+  padding: 0 36px 0 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--card) 94%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-card);
+  color: var(--ink-2);
+}
+.maplibregl-ctrl.maplibregl-ctrl-attrib.maplibregl-compact:hover {
+  border-color: var(--ink);
+}
+.maplibregl-ctrl.maplibregl-ctrl-attrib.maplibregl-compact {
+  /* Open and close like the map key and layer menu: same duration and curve. */
+  interpolate-size: allow-keywords;
+  transition:
+    padding 320ms var(--ease),
+    border-color 0.2s var(--ease);
+}
+.maplibregl-ctrl.maplibregl-ctrl-attrib.maplibregl-compact-show {
+  /* Right: the 36px button plus an 8px gap, so the credits never touch the
+     button's hover circle. */
+  padding: 0 calc(36px + 8px) 0 14px;
+}
+/* The credits stay rendered so they can slide open: width 0 -> auto (browsers
+   without interpolate-size or ::details-content simply show them at once),
+   fading in after they start to open and out before they close. */
+.maplibregl-ctrl-attrib.maplibregl-compact::details-content {
+  content-visibility: visible;
+}
+.maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-inner {
+  display: block;
+  width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    width 320ms var(--ease),
+    opacity 160ms ease,
+    visibility 0s linear 320ms;
+}
+.maplibregl-ctrl-attrib.maplibregl-compact-show .maplibregl-ctrl-attrib-inner {
+  width: auto;
+  opacity: 1;
+  visibility: visible;
+  transition:
+    width 320ms var(--ease),
+    opacity 240ms ease 80ms,
+    visibility 0s;
+}
+.maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-button {
+  top: 0;
+  right: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  /* Our own icon (an ink disc with a white "i" drawn by ::before and ::after),
+     so the "i" can turn into an "x" while the credits are open. */
+  background: radial-gradient(circle, var(--ink) 0 9px, transparent 9.5px) center / 100% no-repeat;
+}
+.maplibregl-ctrl-attrib-button::before,
+.maplibregl-ctrl-attrib-button::after {
+  content: '';
+  position: absolute;
+  left: calc(50% - 0.75px);
+  width: 1.5px; /* crisp, square-ended strokes, like the + and − glyphs */
+  background: var(--card);
+  /* Length and position animate (not a scale), so the strokes stay sharp. */
+  transition:
+    top 320ms var(--ease),
+    height 320ms var(--ease),
+    transform 320ms var(--ease);
+}
+/* Stem of the "i"; one stroke of the "x". */
+.maplibregl-ctrl-attrib-button::before {
+  top: calc(50% - 1.5px);
+  height: 6px;
+}
+/* Dot of the "i"; the other stroke of the "x". */
+.maplibregl-ctrl-attrib-button::after {
+  top: calc(50% - 4.75px);
+  height: 1.5px;
+}
+.maplibregl-compact-show .maplibregl-ctrl-attrib-button::before,
+.maplibregl-compact-show .maplibregl-ctrl-attrib-button::after {
+  top: calc(50% - 4.5px);
+  height: 9px;
+}
+.maplibregl-compact-show .maplibregl-ctrl-attrib-button::before {
+  transform: rotate(45deg);
+}
+.maplibregl-compact-show .maplibregl-ctrl-attrib-button::after {
+  transform: rotate(-45deg);
+}
+/* MapLibre draws a blue glow on :focus, so it shows after every mouse click.
+   Keep only the site's own focus ring, which browsers show for keyboard focus. */
+.maplibregl-ctrl-attrib .maplibregl-ctrl-attrib-button:focus {
+  box-shadow: none;
+}
+.maplibregl-ctrl-attrib .maplibregl-ctrl-attrib-button:focus-visible {
+  outline: 2px solid var(--signal-ink);
+  outline-offset: 2px;
+}
+.maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-button:hover {
+  background-color: var(--paper);
+}
+.maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-inner a {
+  color: var(--ink-2);
 }
 
 /* --------------------------------------------------------------- mobile */
@@ -805,6 +1057,7 @@ a {
   }
   .header {
     right: calc(var(--gutter) * 2 + 40px);
+    width: auto;
     max-width: none;
     padding: 12px 14px 10px;
   }
@@ -831,7 +1084,7 @@ a {
     bottom: calc(var(--gutter) + 24px);
   }
   .drawer-open .controls {
-    right: var(--gutter);
+    transform: none; /* the drawer is a bottom sheet here */
   }
   /* Drawer becomes a bottom sheet. */
   .drawer {

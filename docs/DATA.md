@@ -86,6 +86,17 @@ sample (2026‑11‑20): 77% placed, 22% not found by the Census, 1% rejected fo
 a wrong city, e.g. a Sacramento address on a project listed in Los Angeles). About 3,800 have an address but no
 single city or ZIP to pair it with and are skipped.
 
+**Named places.** Many projects without coordinates, an address or cross streets still name where they are: "beach
+nourishment at La Playa Beach, Shelter Island", "Grover Hot Springs State Park", "Ocotillo Wells SVRA". We look Title
+Case names of two or more words up in the USGS Geographic Names Information System (GNIS, public domain), keep only
+point‑like features (islands, beaches, points, summits, springs, passes, military sites) and communities, and require
+the feature to be in a listed county and near a listed city. Names of streets ("San Pedro Street"), agencies ("…
+Corridor Agency"), cities and counties are skipped, as are names shared by distant features and projects naming places
+more than 15 km apart. A named site is drawn like a cross‑street placement (dot with a lighter center); a named
+community (e.g. Ocotillo Wells, Studio City) as an approximate ring. On the full dataset (2026‑11‑21) this places about
+14,000 projects; a hand check of 70 looked right in roughly 8 of 10. GNIS no longer lists buildings, schools, parks,
+dams or airports (removed in 2022), so "Black Mountain Middle School" finds the summit, not the school.
+
 **ZIP codes.** About 46,000 approximate projects list a valid California ZIP. They are placed at a seeded random spot
 in the Census ZIP Code Tabulation Area (ZCTA), restricted to the part inside the listed city (or county), and only
 when the ZIP is smaller than the city. A ZIP that doesn't overlap the listed places is ignored (agencies sometimes

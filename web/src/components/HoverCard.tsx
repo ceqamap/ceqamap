@@ -58,7 +58,7 @@ export function HoverCard({
           aria-hidden="true"
         />
         {status.label}
-        {info.props.x === 0 ? ' · approximate location' : info.props.x === 2 ? ' · near the listed cross streets' : ''}
+        {info.props.x === 0 ? ' · approximate location' : info.props.x === 2 ? ' · near the listed location' : ''}
       </p>
       {arrival && arrivals && (
         <p className="hover-meta hover-new">

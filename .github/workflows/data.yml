@@ -117,6 +117,19 @@ jobs:
           path: .tiger
           key: tiger-roads-2024-ca
 
+      - name: Restore named places (USGS GNIS)
+        if: steps.decide.outputs.build == 'true'
+        uses: actions/cache@v6
+        with:
+          path: pipeline/data/gnis.json
+          key: gnis-${{ hashFiles('pipeline/scripts/fetch-gnis.ts', 'pipeline/src/lib/landmarks.ts') }}
+
+      - name: Ensure named places
+        if: steps.decide.outputs.build == 'true'
+        # Optional: if USGS is unreachable, the build places these projects the old way.
+        continue-on-error: true
+        run: test -f pipeline/data/gnis.json || node pipeline/scripts/fetch-gnis.ts
+
       - name: Build data
         if: steps.decide.outputs.build == 'true'
         env:

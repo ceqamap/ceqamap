@@ -39,19 +39,22 @@ export const PALETTES: Record<'paper' | 'night', Palette> = {
     labelStrong: '#3b3a38',
     halo: '#f4f2ee',
   },
+  // Land stays at the #121212 surface the stage colors were validated on;
+  // everything else steps away from it so water, parks, streets and labels
+  // read apart (the first version had water and land 3 levels apart).
   night: {
     background: '#121212',
-    water: '#0b0c0c',
-    waterway: '#151818',
-    green: '#161716',
-    landuse: '#151515',
-    building: '#1d1d1c',
-    roadMajor: '#2b2a29',
-    roadMinor: '#1f1e1e',
-    rail: '#2b2a29',
-    boundary: '#3b3a38',
-    label: '#77746f',
-    labelStrong: '#c9c6bf',
+    water: '#0c171d',
+    waterway: '#1a2b34',
+    green: '#182a1d',
+    landuse: '#171716',
+    building: '#21201f',
+    roadMajor: '#3d3b38',
+    roadMinor: '#292826',
+    rail: '#33312e',
+    boundary: '#55524d',
+    label: '#8f8b84',
+    labelStrong: '#d6d3cc',
     halo: '#121212',
   },
 };
@@ -96,6 +99,10 @@ export function paperify(style: StyleSpecification, palette: 'paper' | 'night'):
         paint['fill-color'] = color;
         delete paint['fill-pattern'];
         delete paint['fill-outline-color'];
+        // OpenFreeMap Dark draws woods and residential areas at 40% opacity,
+        // which on a near-black map leaves parks indistinguishable. Night
+        // uses its own solid colors instead.
+        if (palette === 'night' && (role === 'green' || role === 'landuse')) paint['fill-opacity'] = 1;
         break;
       case 'line':
         paint['line-color'] = color;
@@ -114,6 +121,37 @@ export function paperify(style: StyleSpecification, palette: 'paper' | 'night'):
     }
     return { ...layer, paint } as LayerSpecification;
   });
+  // OpenFreeMap Dark has no layer for the `park` source layer (the Presidio,
+  // state and national parks), which Positron draws, nor for grass, where
+  // OpenMapTiles puts city parks. Add both for Night, above the land-use layers.
+  if (palette === 'night' && !layers.some((l) => (l as { 'source-layer'?: string })['source-layer'] === 'park')) {
+    const source = Object.keys(style.sources).find((k) => k === 'openmaptiles');
+    const after = layers.findIndex((l) => l.id === 'landuse_park');
+    if (source && after >= 0) {
+      const polygons = ['match', ['geometry-type'], ['MultiPolygon', 'Polygon'], true, false];
+      layers.splice(
+        after + 1,
+        0,
+        {
+          id: 'park',
+          type: 'fill',
+          source,
+          'source-layer': 'park',
+          filter: polygons,
+          paint: { 'fill-color': p.green },
+        } as unknown as LayerSpecification,
+        // City parks (leisure=park, e.g. Golden Gate Park) are landcover "grass".
+        {
+          id: 'landcover_grass',
+          type: 'fill',
+          source,
+          'source-layer': 'landcover',
+          filter: ['all', polygons, ['==', ['get', 'class'], 'grass']],
+          paint: { 'fill-color': p.green },
+        } as unknown as LayerSpecification,
+      );
+    }
+  }
   // Points of interest compete with our data; hide their icons and labels.
   const quiet = layers.map((l) =>
     /poi|aerodrome|airport_label|housenumber/.test(l.id)

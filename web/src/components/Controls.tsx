@@ -37,33 +37,36 @@ export function Controls({ basemap, onBasemap, onZoomIn, onZoomOut, onReset }: P
       >
         <LayersIcon /> {BASEMAPS.find((b) => b.id === basemap)?.label}
       </button>
-      {open && (
-        <div className="basemap-panel card" role="radiogroup" aria-label="Base map">
-          {BASEMAPS.map((b) => (
-            <button
-              key={b.id}
-              role="radio"
-              aria-checked={b.id === basemap}
-              className="basemap-option"
-              onClick={() => {
-                onBasemap(b.id);
-                setOpen(false);
-              }}
-            >
-              <span className="swatch" style={{ background: b.swatch }} aria-hidden="true" />
-              {b.label}
-            </button>
-          ))}
+      {/* Always rendered, so opening and closing can animate (like the map key); inert while closed. */}
+      <div className={`basemap-panel card ${open ? 'open' : ''}`} inert={!open}>
+        <div className="basemap-clip">
+          <div className="basemap-list" role="radiogroup" aria-label="Base map">
+            {BASEMAPS.map((b) => (
+              <button
+                key={b.id}
+                role="radio"
+                aria-checked={b.id === basemap}
+                className="basemap-option"
+                onClick={() => {
+                  onBasemap(b.id);
+                  setOpen(false);
+                }}
+              >
+                <span className="swatch" style={{ background: b.swatch }} aria-hidden="true" />
+                {b.label}
+              </button>
+            ))}
+          </div>
         </div>
-      )}
+      </div>
       <div className="zoom-group card">
-        <button aria-label="Zoom in" onClick={onZoomIn}>
+        <button className="map-button" aria-label="Zoom in" onClick={onZoomIn}>
           +
         </button>
-        <button aria-label="Zoom out" onClick={onZoomOut}>
+        <button className="map-button" aria-label="Zoom out" onClick={onZoomOut}>
           −
         </button>
-        <button aria-label="Show all of California" onClick={onReset}>
+        <button className="map-button" aria-label="Show all of California" onClick={onReset}>
           <ResetIcon />
         </button>
       </div>
