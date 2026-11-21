@@ -5,8 +5,13 @@ import { formatNumber } from '../lib/format.ts';
 export function Legend({ meta, mode }: { meta: PublishedMeta | null; mode: 'light' | 'dark' }) {
   const [open, setOpen] = useState(() => window.innerWidth >= 720 && window.innerHeight >= 680);
   const approx = meta
-    ? meta.counts.byPrecision.city + meta.counts.byPrecision.county + meta.counts.byPrecision.region
+    ? (meta.counts.byPrecision.zip ?? 0) +
+      meta.counts.byPrecision.city +
+      meta.counts.byPrecision.county +
+      meta.counts.byPrecision.region
     : 0;
+  // Older data files predate street addresses and ZIP codes.
+  const exact = meta ? meta.counts.byPrecision.exact + (meta.counts.byPrecision.address ?? 0) : 0;
 
   return (
     <section className="legend card" aria-labelledby="legend-title">
@@ -33,8 +38,8 @@ export function Legend({ meta, mode }: { meta: PublishedMeta | null; mode: 'ligh
           <ul className="legend-list precision">
             <li>
               <span className="dot solid" aria-hidden="true" />
-              <span className="legend-label">Exact location</span>
-              <span className="legend-count">{meta ? formatNumber(meta.counts.byPrecision.exact) : ''}</span>
+              <span className="legend-label">Exact location or street address</span>
+              <span className="legend-count">{meta ? formatNumber(exact) : ''}</span>
             </li>
             <li>
               <span className="dot cross" aria-hidden="true" />

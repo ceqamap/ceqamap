@@ -10,7 +10,7 @@ import {
 import type { CeqaDocument } from './document.ts';
 import type { Boundaries } from './boundaries.ts';
 import type { CrossStreetPlacement } from './crossStreets.ts';
-import { resolveLocation } from './location.ts';
+import { type AddressPlacement, type LocationHints, resolveLocation } from './location.ts';
 import { deriveStatus } from './status.ts';
 
 /**
@@ -71,12 +71,12 @@ export function buildProject(
   boundaries: Boundaries,
   today: string,
   builtAt: string,
-  crossStreets?: CrossStreetPlacement,
+  hints: LocationHints = {},
 ): PublishedProject {
   const newestFirst = [...docs].sort((a, b) => (a.received < b.received ? 1 : a.received > b.received ? -1 : 0));
   const latest = newestFirst[0];
   const status = deriveStatus(docs, today);
-  const loc = resolveLocation(sch, newestFirst, boundaries, { crossStreets });
+  const loc = resolveLocation(sch, newestFirst, boundaries, hints);
   const placeDoc = newestFirst.find((d) => d.cities.length || d.counties.length) ?? latest;
 
   return {
@@ -98,6 +98,7 @@ export function buildProject(
           zip: firstNonEmpty(newestFirst.map((d) => d.zip)) || null,
           coordinatesRejected: loc.coordinatesRejected,
           ...(loc.streets ? { streets: loc.streets } : {}),
+          ...(loc.address ? { address: loc.address } : {}),
         }
       : null,
     facts: {
@@ -125,12 +126,18 @@ function round6(n: number): number {
   return Math.round(n * 1e6) / 1e6;
 }
 
+/** Precomputed placements, by SCH number (they need files or network, so they are resolved before aggregating). */
+export interface Placements {
+  crossStreets?: ReadonlyMap<string, CrossStreetPlacement>;
+  addresses?: ReadonlyMap<string, AddressPlacement>;
+}
+
 export function aggregate(
   docs: Iterable<CeqaDocument>,
   boundaries: Boundaries,
   today: string,
   builtAt: string,
-  crossStreets: ReadonlyMap<string, CrossStreetPlacement> = new Map(),
+  placements: Placements = {},
 ): AggregateResult {
   const groups = groupBySch(docs);
   const projects: PublishedProject[] = [];
@@ -139,7 +146,7 @@ export function aggregate(
     ProjectStatus,
     number
   >;
-  const byPrecision = { exact: 0, intersection: 0, city: 0, county: 0, region: 0 } satisfies Record<
+  const byPrecision = { exact: 0, address: 0, intersection: 0, zip: 0, city: 0, county: 0, region: 0 } satisfies Record<
     LocationPrecision,
     number
   >;
@@ -150,7 +157,10 @@ export function aggregate(
   for (const [sch, list] of groups) {
     documents += list.length;
     for (const d of list) if (d.received > latestReceived) latestReceived = d.received;
-    const p = buildProject(sch, list, boundaries, today, builtAt, crossStreets.get(sch));
+    const p = buildProject(sch, list, boundaries, today, builtAt, {
+      crossStreets: placements.crossStreets?.get(sch),
+      address: placements.addresses?.get(sch),
+    });
     projects.push(p);
     byStatus[p.status]++;
     if (p.location) {

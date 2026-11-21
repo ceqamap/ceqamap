@@ -97,11 +97,13 @@ export const STATUS_BY_ID: Readonly<Record<ProjectStatus, StatusDefinition>> = O
  * How we know where a project is. Only `exact` comes from coordinates the
  * lead agency entered; everything else is a best-effort placement.
  */
-export type LocationPrecision = 'exact' | 'intersection' | 'city' | 'county' | 'region';
+export type LocationPrecision = 'exact' | 'address' | 'intersection' | 'zip' | 'city' | 'county' | 'region';
 
 export const PRECISION_LABEL: Readonly<Record<LocationPrecision, string>> = {
   exact: 'Coordinates provided by the lead agency',
+  address: 'At the street address in the project description',
   intersection: 'Near the listed cross streets',
+  zip: 'Approximate: placed within the listed ZIP code',
   city: 'Approximate: placed within the listed city',
   county: 'Approximate: placed within the listed county',
   region: 'Approximate: placed between the listed counties',
@@ -110,7 +112,9 @@ export const PRECISION_LABEL: Readonly<Record<LocationPrecision, string>> = {
 /** How each precision is drawn: 1 solid dot, 2 dot with a lighter center, 0 hollow ring. */
 export const PRECISION_MARK: Readonly<Record<LocationPrecision, 0 | 1 | 2>> = {
   exact: 1,
+  address: 1,
   intersection: 2,
+  zip: 0,
   city: 0,
   county: 0,
   region: 0,
@@ -198,6 +202,8 @@ export interface PublishedProject {
     coordinatesRejected: boolean;
     /** For `intersection`: the two listed streets whose meeting point was used. */
     streets?: [string, string];
+    /** For `address`: the address that was geocoded, e.g. "1234 Main St, Fresno". */
+    address?: string;
   } | null;
   facts: {
     totalAcres: number | null;

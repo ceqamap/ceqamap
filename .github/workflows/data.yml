@@ -62,8 +62,13 @@ jobs:
       - name: Install
         run: |
           if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile --filter @ceqa-atlas/pipeline...; else pnpm install --filter @ceqa-atlas/pipeline...; fi
-      - name: Ensure city and county boundaries
-        run: test -f pipeline/data/boundaries.json || pnpm --filter @ceqa-atlas/pipeline boundaries
+      - name: Restore city, county and ZIP boundaries
+        uses: actions/cache@v6
+        with:
+          path: pipeline/data/boundaries.json
+          key: boundaries-${{ hashFiles('pipeline/scripts/fetch-boundaries.ts', 'pipeline/src/lib/boundaries.ts', 'pipeline/src/lib/geometry.ts', 'pipeline/src/lib/shapefile.ts') }}
+      - name: Ensure city, county and ZIP boundaries
+        run: test -f pipeline/data/boundaries.json || NODE_OPTIONS=--max-old-space-size=8192 pnpm --filter @ceqa-atlas/pipeline boundaries
 
       - name: Backfill history
         if: inputs.mode == 'backfill' && inputs.target != 'preview'

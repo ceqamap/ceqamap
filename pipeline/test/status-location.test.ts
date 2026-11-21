@@ -195,6 +195,54 @@ describe('resolveLocation', () => {
     assert.equal(r, null);
   });
 
+  it('prefers a geocoded street address over cross streets', () => {
+    const r = resolveLocation('x', [doc({ cities: ['Redding'] })], B, {
+      crossStreets: { lon: -122.37, lat: 40.6, streets: ['Market St', 'Shasta St'] },
+      address: { lon: -122.39, lat: 40.58, address: '1234 Main St, Redding' },
+    })!;
+    assert.equal(r.precision, 'address');
+    assert.equal(r.address, '1234 Main St, Redding');
+    assert.equal(r.lon, -122.39);
+  });
+
+  describe('ZIP codes', () => {
+    const zips = {
+      // A small ZIP inside Redding, one straddling Redding's edge, one far away.
+      '96001': area('96001', rect(-122.42, 40.56, -122.38, 40.6)),
+      '96002': area('96002', rect(-122.34, 40.55, -122.28, 40.6)),
+      '93501': area('93501', rect(-118.2, 35.0, -118.1, 35.1)),
+      // Larger than Redding.
+      '96003': area('96003', rect(-122.5, 40.5, -121.9, 40.9)),
+    };
+    const bz: Boundaries = { ...B, zips };
+    const inside = (r: { lon: number; lat: number }, a: { shape: Ring[] }) => pointInShape(r.lon, r.lat, a.shape);
+
+    it('places within the listed ZIP code when it is inside the listed city', () => {
+      const r = resolveLocation('2001', [doc({ cities: ['Redding'], zip: '96001-1234' })], bz)!;
+      assert.equal(r.precision, 'zip');
+      assert.ok(inside(r, zips['96001']));
+    });
+
+    it('keeps a straddling ZIP to the part inside the listed city', () => {
+      for (const sch of ['a', 'b', 'c', 'd', 'e']) {
+        const r = resolveLocation(sch, [doc({ cities: ['Redding'], zip: '96002' })], bz)!;
+        assert.equal(r.precision, 'zip');
+        assert.ok(inside(r, B.places.redding) && inside(r, zips['96002']));
+      }
+    });
+
+    it('ignores a ZIP that contradicts the listed places, or is bigger than the city', () => {
+      assert.equal(resolveLocation('x', [doc({ cities: ['Redding'], zip: '93501' })], bz)?.precision, 'city');
+      assert.equal(resolveLocation('x', [doc({ cities: ['Redding'], zip: '96003' })], bz)?.precision, 'city');
+    });
+
+    it('uses a ZIP within the listed county when no city is listed', () => {
+      const r = resolveLocation('x', [doc({ counties: ['Shasta'], zip: '96003' })], bz)!;
+      assert.equal(r.precision, 'zip');
+      assert.ok(inside(r, zips['96003']));
+    });
+  });
+
   it('uses a cross-street placement ahead of city or county guesses', () => {
     const hint = { lon: -122.37, lat: 40.6, streets: ['Market St', 'Shasta St'] as [string, string] };
     const r = resolveLocation('x', [doc({ cities: ['Redding'] })], B, { crossStreets: hint });
@@ -354,7 +402,7 @@ describe('aggregate', () => {
     const placements = new Map([
       ['1999011038', { lon: -122.2, lat: 40.7, streets: ['A St', 'B St'] as [string, string] }],
     ]);
-    const r = aggregate(docs, B, TODAY, '2026-11-18T00:00:00Z', placements);
+    const r = aggregate(docs, B, TODAY, '2026-11-18T00:00:00Z', { crossStreets: placements });
     assert.equal(r.points[0].properties.x, 2);
     assert.equal(r.counts.byPrecision.intersection, 1);
     assert.deepEqual(r.projects[0].location?.streets, ['A St', 'B St']);
