@@ -46,7 +46,7 @@ export const PALETTES: Record<'paper' | 'night', Palette> = {
     background: '#121212',
     water: '#0c171d',
     waterway: '#1a2b34',
-    green: '#151c15',
+    green: '#182a1d',
     landuse: '#171716',
     building: '#21201f',
     roadMajor: '#3d3b38',
