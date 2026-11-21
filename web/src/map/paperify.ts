@@ -121,21 +121,35 @@ export function paperify(style: StyleSpecification, palette: 'paper' | 'night'):
     }
     return { ...layer, paint } as LayerSpecification;
   });
-  // OpenFreeMap Dark has no layer for the `park` source layer (Golden Gate
-  // Park, state and national parks), which Positron draws. Add one for Night,
-  // just above the land-use layers.
+  // OpenFreeMap Dark has no layer for the `park` source layer (the Presidio,
+  // state and national parks), which Positron draws, nor for grass, where
+  // OpenMapTiles puts city parks. Add both for Night, above the land-use layers.
   if (palette === 'night' && !layers.some((l) => (l as { 'source-layer'?: string })['source-layer'] === 'park')) {
     const source = Object.keys(style.sources).find((k) => k === 'openmaptiles');
     const after = layers.findIndex((l) => l.id === 'landuse_park');
     if (source && after >= 0) {
-      layers.splice(after + 1, 0, {
-        id: 'park',
-        type: 'fill',
-        source,
-        'source-layer': 'park',
-        filter: ['match', ['geometry-type'], ['MultiPolygon', 'Polygon'], true, false],
-        paint: { 'fill-color': p.green },
-      } as LayerSpecification);
+      const polygons = ['match', ['geometry-type'], ['MultiPolygon', 'Polygon'], true, false];
+      layers.splice(
+        after + 1,
+        0,
+        {
+          id: 'park',
+          type: 'fill',
+          source,
+          'source-layer': 'park',
+          filter: polygons,
+          paint: { 'fill-color': p.green },
+        } as LayerSpecification,
+        // City parks (leisure=park, e.g. Golden Gate Park) are landcover "grass".
+        {
+          id: 'landcover_grass',
+          type: 'fill',
+          source,
+          'source-layer': 'landcover',
+          filter: ['all', polygons, ['==', ['get', 'class'], 'grass']],
+          paint: { 'fill-color': p.green },
+        } as LayerSpecification,
+      );
     }
   }
   // Points of interest compete with our data; hide their icons and labels.
