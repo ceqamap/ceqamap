@@ -239,7 +239,7 @@ a {
 .scope-select select {
   appearance: none;
   margin: 0;
-  padding: 0 11px 0 0;
+  padding: 0 13px 0 0; /* 8px chevron + 5px gap */
   border: 0;
   background: none;
   font: inherit;
@@ -257,9 +257,15 @@ a {
 .scope-chevron {
   position: absolute;
   right: 0;
+  top: 50%;
+  margin-top: -1.5px; /* centered on the lowercase letters, not the line box */
   pointer-events: none;
-  font-size: 10px;
   color: var(--muted);
+  transition: color 0.2s var(--ease);
+}
+.scope-select:hover .scope-chevron,
+.scope-select:focus-within .scope-chevron {
+  color: var(--ink);
 }
 @keyframes ping {
   from {

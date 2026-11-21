@@ -91,9 +91,9 @@ export function Header({ meta, status, scope, stages, onScope, arrivalIndex, onN
                           </option>
                         ))}
                       </select>
-                      <span className="scope-chevron" aria-hidden="true">
-                        ▾
-                      </span>
+                      <svg className="scope-chevron" width="8" height="5" viewBox="0 0 8 5" aria-hidden="true">
+                        <path d="M0.75 0.75 4 4 7.25 0.75" fill="none" stroke="currentColor" strokeWidth="1.25" />
+                      </svg>
                     </label>
                   </>
                 )}
