@@ -46,7 +46,7 @@ hidden a cluster may sit slightly off the center of what it still counts.)
 Projects whose documents our pipeline saw for the first time in the latest batch get the header's ping: a hairline
 green ring that grows and fades, on the same 2.4 s clock as the live dot (see `web/src/lib/motion.ts`). Clusters ping
 if they contain one. The in-review halo is soft and blurred so the two don't read as the same signal. The header's
-"N new" link frames the batch; hovering says "New project" or "New filing: Notice of Determination". The batch is
+"N new" link visits them one at a time (fly there, open the drawer); hovering says "New project" or "New filing: Notice of Determination". The batch is
 replaced only by the next run that brings new documents, so the pings stay up overnight and over weekends.
 
 ### Stage colors
