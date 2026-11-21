@@ -27,6 +27,7 @@ const FALLBACK_PHRASE: Record<LocationPrecision, string> = {
   exact: 'at its coordinates',
   address: 'at the street address in its description',
   intersection: 'near its listed cross streets',
+  street: 'along its listed street',
   zip: 'within its listed ZIP code',
   city: 'within its listed city',
   county: 'within its listed county',
@@ -154,7 +155,7 @@ function ProjectDetail({
             <span className="muted">
               {' · '}
               {PRECISION_LABEL[p.location.precision]}
-              {p.location.streets && ` (${p.location.streets[0]} and ${p.location.streets[1]})`}
+              {p.location.streets && ` (${p.location.streets.join(' and ')})`}
               {p.location.address && ` (${p.location.address})`}
               {p.location.precision === 'zip' && p.location.zip && ` (${p.location.zip})`}
             </span>

@@ -146,10 +146,16 @@ export function aggregate(
     ProjectStatus,
     number
   >;
-  const byPrecision = { exact: 0, address: 0, intersection: 0, zip: 0, city: 0, county: 0, region: 0 } satisfies Record<
-    LocationPrecision,
-    number
-  >;
+  const byPrecision = {
+    exact: 0,
+    address: 0,
+    intersection: 0,
+    street: 0,
+    zip: 0,
+    city: 0,
+    county: 0,
+    region: 0,
+  } satisfies Record<LocationPrecision, number>;
   let documents = 0;
   let coordinatesRejected = 0;
   let latestReceived = '';

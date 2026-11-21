@@ -18,7 +18,8 @@ import { seededRandom } from './random.ts';
  *      county); a point that contradicts the project's own places is wrong.
  *   2. A street address written in the project's text, geocoded by the
  *      Census and checked against the listed places (see geocode.ts).
- *   3. Where the listed cross streets meet (see crossStreets.ts), if found.
+ *   3. Where the listed cross streets meet (see crossStreets.ts), if found,
+ *      or, when only one street is listed, a seeded spot along it.
  *   4. A random spot inside the listed ZIP code, where it overlaps the
  *      listed city (or county), when the ZIP area is smaller than the city.
  *   5. A random spot inside the listed city (or 2–3 nearby cities).
@@ -39,8 +40,8 @@ export interface ResolvedLocation {
   precision: LocationPrecision;
   /** True when the agency's coordinates were discarded as inconsistent. */
   coordinatesRejected: boolean;
-  /** For `intersection`: the streets used. */
-  streets?: [string, string];
+  /** For `intersection` and `street`: the streets used. */
+  streets?: string[];
   /** For `address`: the address geocoded. */
   address?: string;
 }
@@ -53,7 +54,8 @@ export interface AddressPlacement {
 }
 
 export interface LocationHints {
-  crossStreets?: { lon: number; lat: number; streets: [string, string] };
+  /** Where the listed cross streets meet, or (kind `street`) a spot along the one listed street. */
+  crossStreets?: { lon: number; lat: number; kind?: 'intersection' | 'street'; streets: string[] };
   /** Already checked against the listed places. */
   address?: AddressPlacement;
 }
@@ -204,8 +206,8 @@ export function resolveLocation(
   }
 
   if (hints.crossStreets) {
-    const { lon, lat, streets } = hints.crossStreets;
-    return { lon, lat, precision: 'intersection', coordinatesRejected, streets };
+    const { lon, lat, streets, kind } = hints.crossStreets;
+    return { lon, lat, precision: kind === 'street' ? 'street' : 'intersection', coordinatesRejected, streets };
   }
 
   const zipPoint = placeInZip(sch, docsNewestFirst, places, b);

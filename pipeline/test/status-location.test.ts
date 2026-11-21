@@ -424,7 +424,7 @@ describe('aggregate', () => {
       doc({ sch: '1999011038', type: 'NOD', cities: [], counties: ['Shasta'], crossStreets: 'A St and B St' }),
     ];
     const placements = new Map([
-      ['1999011038', { lon: -122.2, lat: 40.7, streets: ['A St', 'B St'] as [string, string] }],
+      ['1999011038', { lon: -122.2, lat: 40.7, kind: 'intersection' as const, streets: ['A St', 'B St'] }],
     ]);
     const r = aggregate(docs, B, TODAY, '2026-11-18T00:00:00Z', { crossStreets: placements });
     assert.equal(r.points[0].properties.x, 2);
