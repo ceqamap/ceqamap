@@ -6,7 +6,15 @@ import {
   STATUS_BY_ID,
 } from '../../../packages/shared/src/index.ts';
 import { fetchProject } from '../lib/data.ts';
-import { formatDate, formatNumber, placeLine, reviewCountdown, splitFacts, todayInCalifornia } from '../lib/format.ts';
+import {
+  factTag,
+  formatDate,
+  formatNumber,
+  placeLine,
+  reviewCountdown,
+  splitFacts,
+  todayInCalifornia,
+} from '../lib/format.ts';
 
 interface Props {
   sch: string | null;
@@ -200,7 +208,7 @@ function ProjectDetail({
                   <dd>
                     <ul className="tags">
                       {v.map((t) => (
-                        <li key={t}>{t}</li>
+                        <Tag key={t} text={t} />
                       ))}
                     </ul>
                   </dd>
@@ -251,6 +259,26 @@ function ProjectDetail({
         clerk, so “Review closed” projects may already be approved.
       </p>
     </article>
+  );
+}
+
+/**
+ * One fact as a tag. Long CEQAnet entries ("Commercial (Commercial Uses and
+ * Employees not defined at this time)(Sq. Ft. 27000, Acres 0.62, Employees
+ * 25)") show the category plus its numbers on one line, cut with an ellipsis
+ * if still too long; click to read the whole entry.
+ */
+function Tag({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const { label, detail, full } = factTag(text);
+  if (!detail) return <li className="tag">{label}</li>;
+  return (
+    <li className={`tag has-detail ${open ? 'open' : ''}`}>
+      <button type="button" aria-expanded={open} title={open ? undefined : full} onClick={() => setOpen((o) => !o)}>
+        <span className="tag-label">{label}</span>
+        <span className="tag-detail">{open ? full.slice(label.length).trim() : detail}</span>
+      </button>
+    </li>
   );
 }
 
