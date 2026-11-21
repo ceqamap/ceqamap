@@ -941,7 +941,9 @@ a {
   border-color: var(--ink);
 }
 .maplibregl-ctrl.maplibregl-ctrl-attrib.maplibregl-compact-show {
-  padding: 0 36px 0 14px;
+  /* Right: the 36px button plus the same 14px gap as the left edge, so the
+     credits never touch the button's hover circle. */
+  padding: 0 calc(36px + 14px) 0 14px;
 }
 .maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-button {
   top: 0;
