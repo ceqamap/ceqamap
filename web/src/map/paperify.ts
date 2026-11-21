@@ -139,7 +139,7 @@ export function paperify(style: StyleSpecification, palette: 'paper' | 'night'):
           'source-layer': 'park',
           filter: polygons,
           paint: { 'fill-color': p.green },
-        } as LayerSpecification,
+        } as unknown as LayerSpecification,
         // City parks (leisure=park, e.g. Golden Gate Park) are landcover "grass".
         {
           id: 'landcover_grass',
@@ -148,7 +148,7 @@ export function paperify(style: StyleSpecification, palette: 'paper' | 'night'):
           'source-layer': 'landcover',
           filter: ['all', polygons, ['==', ['get', 'class'], 'grass']],
           paint: { 'fill-color': p.green },
-        } as LayerSpecification,
+        } as unknown as LayerSpecification,
       );
     }
   }
