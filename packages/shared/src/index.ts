@@ -98,16 +98,7 @@ export const STATUS_BY_ID: Readonly<Record<ProjectStatus, StatusDefinition>> = O
  * lead agency entered; everything else is a best-effort placement.
  */
 export type LocationPrecision =
-  | 'exact'
-  | 'address'
-  | 'intersection'
-  | 'landmark'
-  | 'street'
-  | 'community'
-  | 'zip'
-  | 'city'
-  | 'county'
-  | 'region';
+  'exact' | 'address' | 'intersection' | 'landmark' | 'street' | 'community' | 'zip' | 'city' | 'county' | 'region';
 
 export const PRECISION_LABEL: Readonly<Record<LocationPrecision, string>> = {
   exact: 'Coordinates provided by the lead agency',

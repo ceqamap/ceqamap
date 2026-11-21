@@ -152,7 +152,7 @@ export function normalizeName(name: string): string {
 
 /** Parse a GNIS pipe-delimited DomesticNames file into a compact gazetteer. */
 export function parseGnis(text: string, source: string, keepClasses = CLASS_RANK): Gazetteer {
-  const lines = text.replace(/^﻿/, '').split(/\r?\n/);
+  const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/);
   const header = lines[0].split('|').map((h) => h.trim().toLowerCase());
   const col = (name: string) => {
     const i = header.indexOf(name);
@@ -193,7 +193,7 @@ export interface NameMention {
   field: number;
 }
 
-const WORD = /[A-Za-z0-9][A-Za-z0-9'’.\-]*/g;
+const WORD = /[A-Za-z0-9][A-Za-z0-9'’.-]*/g;
 
 /**
  * Candidate place names: runs of 2–6 Title Case words (connectors like "de",
@@ -228,7 +228,7 @@ export function nameMentions(texts: readonly string[]): NameMention[] {
 
 function isCapitalized(w: string): boolean {
   // "Shelter", "McKinley", "O'Neill"; not "island", not "USA" alone matters little.
-  return /^[A-Z][a-zA-Z'’.\-]*$/.test(w) || /^[A-Z]{2,}$/.test(w);
+  return /^[A-Z][a-zA-Z'’.-]*$/.test(w) || /^[A-Z]{2,}$/.test(w);
 }
 
 export interface LandmarkPlacement {
@@ -243,8 +243,7 @@ export interface LandmarkPlacement {
 }
 
 export type LandmarkOutcome =
-  | { kind: 'placed'; placement: LandmarkPlacement }
-  | { kind: 'none' | 'ambiguous' | 'multi-site' | 'far-from-city' };
+  { kind: 'placed'; placement: LandmarkPlacement } | { kind: 'none' | 'ambiguous' | 'multi-site' | 'far-from-city' };
 
 export interface LandmarkContext {
   /** Normalized county names the project lists. */
