@@ -676,7 +676,8 @@ a {
 }
 .facts div {
   display: grid;
-  grid-template-columns: 112px 1fr;
+  /* minmax(0, …): one-line tags must shrink to the drawer, not widen it. */
+  grid-template-columns: 112px minmax(0, 1fr);
   gap: 12px;
 }
 .facts dt {
@@ -684,6 +685,7 @@ a {
   color: var(--muted);
 }
 .facts dd {
+  min-width: 0;
   margin: 0;
   font-size: 14px;
 }
