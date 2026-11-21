@@ -388,7 +388,8 @@ a {
   line-height: 1;
 }
 .map-button:hover {
-  background: var(--paper);
+  /* --paper on the card is nearly invisible (about 1.03:1); --line reads as a quiet tint. */
+  background: var(--line);
 }
 
 /* --------------------------------------------------------------- legend */
@@ -477,7 +478,7 @@ a {
   text-align: left;
 }
 .stage-toggle:hover {
-  background: var(--paper);
+  background: var(--line);
 }
 .stage-toggle.off .legend-label,
 .stage-toggle.off .legend-count {
