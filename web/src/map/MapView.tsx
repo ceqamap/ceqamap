@@ -60,6 +60,10 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
   const hoveredId = useRef<string | null>(null);
   const appliedSelected = useRef<string | null>(null);
   const appliedTiles = useRef<string | null>(null);
+  // True between a style's 'style.load' and the next setStyle. We track this
+  // ourselves: map.isStyleLoaded() is also false while basemap tiles are still
+  // streaming in, which made us skip adding the project layers (2026-11-19).
+  const styleReady = useRef(false);
 
   useImperativeHandle(ref, () => ({
     zoomIn: () => mapRef.current?.zoomIn(),
@@ -105,7 +109,10 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       map.touchZoomRotate.disableRotation();
       mapRef.current = map;
 
-      map.on('style.load', () => addDataLayers(map!));
+      map.on('style.load', () => {
+        styleReady.current = true;
+        addDataLayers(map!);
+      });
       map.on('error', (e) => {
         // Missing tiles at the edges are normal; only surface source failures.
         if ((e as { sourceId?: string }).sourceId === SOURCE_ID)
@@ -200,7 +207,9 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     basemap
       .style()
       .then((style) => {
-        if (!cancelled) map.setStyle(style, { diff: false }); // style.load re-adds our layers
+        if (cancelled) return;
+        styleReady.current = false;
+        map.setStyle(style, { diff: false }); // style.load re-adds our layers
       })
       .catch((e: Error) => latest.current.onError(e.message));
     return () => {
@@ -211,7 +220,8 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
   // --- New data build: swap the tileset in place ---------------------------
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !props.tilesUrl || appliedTiles.current === props.tilesUrl || !map.isStyleLoaded()) return;
+    // If the style isn't ready yet, its style.load handler adds the layers with the latest URL.
+    if (!map || !props.tilesUrl || appliedTiles.current === props.tilesUrl || !styleReady.current) return;
     const source = map.getSource(SOURCE_ID) as maplibregl.VectorTileSource | undefined;
     if (source) source.setUrl(`pmtiles://${props.tilesUrl}`);
     else ensureProjectLayers(map, props.tilesUrl, { mode: props.basemap.mode });
