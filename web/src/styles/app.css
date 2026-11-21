@@ -402,10 +402,34 @@ a {
   /* Same 2px inset as the zoom controls, so the header button lines up with them. */
   padding: 2px;
 }
-/* Collapsed: a pill as tall as the zoom controls are wide (36px button + 2px inset + border). */
+/* Collapsed: a pill as tall as the zoom controls are wide (36px button + 2px
+   inset + border). The radius is half that height, not 999px, so it eases
+   smoothly to and from the card radius. */
+.legend {
+  transition: border-radius 320ms var(--ease);
+}
 .legend.collapsed {
-  width: auto;
-  border-radius: var(--radius-pill);
+  border-radius: 21px;
+}
+/* Expand and collapse: animate the body's height (0fr <-> 1fr) and fade it. */
+.legend-reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 320ms var(--ease),
+    opacity 160ms ease;
+}
+.legend.open .legend-reveal {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition:
+    grid-template-rows 320ms var(--ease),
+    opacity 240ms ease 80ms;
+}
+.legend-clip {
+  min-height: 0;
+  overflow: hidden;
 }
 .legend-head {
   display: flex;

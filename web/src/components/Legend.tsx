@@ -43,67 +43,70 @@ export function Legend({ meta, mode, scope, stages, onStages }: Props) {
           {open ? '−' : '+'}
         </button>
       </div>
-      {open && (
-        <div id="legend-body" className="legend-body">
-          <ul className="legend-list stages" aria-label="Stages shown on the map">
-            {STATUSES.map((s) => {
-              const on = stages.includes(s.id);
-              return (
-                <li key={s.id}>
-                  <button
-                    type="button"
-                    className={`stage-toggle ${on ? '' : 'off'}`}
-                    aria-pressed={on}
-                    title={`${s.description} Click to ${on ? 'hide' : 'show'}; Alt-click to show only this stage.`}
-                    onClick={(e) => onStages(nextStages(stages, s.id, e.altKey))}
-                  >
-                    <span
-                      className={`dot ${mode}`}
-                      style={
-                        on
-                          ? { background: s[mode] }
-                          : { background: 'transparent', boxShadow: `inset 0 0 0 1.5px ${s[mode]}` }
-                      }
-                      aria-hidden="true"
-                    />
-                    <span className="legend-label">{s.label}</span>
-                    <span className="legend-count">{counts ? formatNumber(counts.byStatus[s.id]) : ''}</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-          {filtered && (
-            <button type="button" className="legend-reset" onClick={() => onStages([...ALL_STAGES])}>
-              Show all stages
-            </button>
-          )}
-          <hr />
-          <ul className="legend-list precision">
-            <li>
-              <span className="dot solid" aria-hidden="true" />
-              <span className="legend-label">Exact location or street address</span>
-              <span className="legend-count">{counts ? formatNumber(counts.byMark.exact) : ''}</span>
-            </li>
-            <li>
-              <span className="dot cross" aria-hidden="true" />
-              <span className="legend-label">Near the listed cross streets or a named place</span>
-              <span className="legend-count">{counts ? formatNumber(counts.byMark.intersection) : ''}</span>
-            </li>
-            <li>
-              <span className="dot ring" aria-hidden="true" />
-              <span className="legend-label">Approximate location</span>
-              <span className="legend-count">{counts ? formatNumber(counts.byMark.approx) : ''}</span>
-            </li>
-          </ul>
-          {meta && meta.counts.unmapped > 0 && (
-            <p className="legend-note">
-              {formatNumber(meta.counts.unmapped)} statewide or multi‑region projects have no single location and are
-              not shown.
-            </p>
-          )}
+      {/* Always rendered, so opening and closing can animate; inert while closed. */}
+      <div id="legend-body" className="legend-reveal" inert={!open}>
+        <div className="legend-clip">
+          <div className="legend-body">
+            <ul className="legend-list stages" aria-label="Stages shown on the map">
+              {STATUSES.map((s) => {
+                const on = stages.includes(s.id);
+                return (
+                  <li key={s.id}>
+                    <button
+                      type="button"
+                      className={`stage-toggle ${on ? '' : 'off'}`}
+                      aria-pressed={on}
+                      title={`${s.description} Click to ${on ? 'hide' : 'show'}; Alt-click to show only this stage.`}
+                      onClick={(e) => onStages(nextStages(stages, s.id, e.altKey))}
+                    >
+                      <span
+                        className={`dot ${mode}`}
+                        style={
+                          on
+                            ? { background: s[mode] }
+                            : { background: 'transparent', boxShadow: `inset 0 0 0 1.5px ${s[mode]}` }
+                        }
+                        aria-hidden="true"
+                      />
+                      <span className="legend-label">{s.label}</span>
+                      <span className="legend-count">{counts ? formatNumber(counts.byStatus[s.id]) : ''}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            {filtered && (
+              <button type="button" className="legend-reset" onClick={() => onStages([...ALL_STAGES])}>
+                Show all stages
+              </button>
+            )}
+            <hr />
+            <ul className="legend-list precision">
+              <li>
+                <span className="dot solid" aria-hidden="true" />
+                <span className="legend-label">Exact location or street address</span>
+                <span className="legend-count">{counts ? formatNumber(counts.byMark.exact) : ''}</span>
+              </li>
+              <li>
+                <span className="dot cross" aria-hidden="true" />
+                <span className="legend-label">Near the listed cross streets or a named place</span>
+                <span className="legend-count">{counts ? formatNumber(counts.byMark.intersection) : ''}</span>
+              </li>
+              <li>
+                <span className="dot ring" aria-hidden="true" />
+                <span className="legend-label">Approximate location</span>
+                <span className="legend-count">{counts ? formatNumber(counts.byMark.approx) : ''}</span>
+              </li>
+            </ul>
+            {meta && meta.counts.unmapped > 0 && (
+              <p className="legend-note">
+                {formatNumber(meta.counts.unmapped)} statewide or multi‑region projects have no single location and are
+                not shown.
+              </p>
+            )}
+          </div>
         </div>
-      )}
+      </div>
     </section>
   );
 }
