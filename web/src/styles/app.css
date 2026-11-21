@@ -951,6 +951,10 @@ a {
   border-radius: 50%;
   background-color: transparent;
   background-position: center;
+  background-repeat: no-repeat; /* the 24px icon tiled at the edges of the larger button */
+}
+.maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-button:hover {
+  background-color: var(--paper);
 }
 .maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-inner a {
   color: var(--ink-2);
