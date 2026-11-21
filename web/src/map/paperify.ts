@@ -39,19 +39,22 @@ export const PALETTES: Record<'paper' | 'night', Palette> = {
     labelStrong: '#3b3a38',
     halo: '#f4f2ee',
   },
+  // Land stays at the #121212 surface the stage colors were validated on;
+  // everything else steps away from it so water, parks, streets and labels
+  // read apart (the first version had water and land 3 levels apart).
   night: {
     background: '#121212',
-    water: '#0b0c0c',
-    waterway: '#151818',
-    green: '#161716',
-    landuse: '#151515',
-    building: '#1d1d1c',
-    roadMajor: '#2b2a29',
-    roadMinor: '#1f1e1e',
-    rail: '#2b2a29',
-    boundary: '#3b3a38',
-    label: '#77746f',
-    labelStrong: '#c9c6bf',
+    water: '#0c171d',
+    waterway: '#1a2b34',
+    green: '#151c15',
+    landuse: '#171716',
+    building: '#21201f',
+    roadMajor: '#3d3b38',
+    roadMinor: '#292826',
+    rail: '#33312e',
+    boundary: '#55524d',
+    label: '#8f8b84',
+    labelStrong: '#d6d3cc',
     halo: '#121212',
   },
 };

@@ -916,7 +916,44 @@ a {
   font-size: 11px;
 }
 .maplibregl-ctrl-bottom-right {
-  margin: 0 14px 14px 0;
+  margin: 0 var(--gutter) var(--gutter) 0;
+}
+/* Attribution as a pill like the map layer button: 38px tall with its border,
+   the info icon a 36px round button at its right end. Expanded, the credits
+   sit inside the same pill. */
+.maplibregl-ctrl.maplibregl-ctrl-attrib.maplibregl-compact {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  min-height: 38px;
+  margin: 0;
+  padding: 0 36px 0 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--card) 94%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-card);
+  color: var(--ink-2);
+  transition: border-color 0.2s var(--ease);
+}
+.maplibregl-ctrl.maplibregl-ctrl-attrib.maplibregl-compact:hover {
+  border-color: var(--ink);
+}
+.maplibregl-ctrl.maplibregl-ctrl-attrib.maplibregl-compact-show {
+  padding: 0 36px 0 14px;
+}
+.maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-button {
+  top: 0;
+  right: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: transparent;
+  background-position: center;
+}
+.maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-inner a {
+  color: var(--ink-2);
 }
 
 /* --------------------------------------------------------------- mobile */
