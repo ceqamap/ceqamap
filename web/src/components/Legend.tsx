@@ -26,17 +26,25 @@ export function Legend({ meta, mode, scope, stages, onStages }: Props) {
   const filtered = !allStagesShown(stages);
 
   return (
-    <section className="legend card" aria-labelledby="legend-title">
-      <button className="legend-toggle" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-        <span id="legend-title" className="eyebrow">
+    <section className={`legend card ${open ? 'open' : 'collapsed'}`} aria-labelledby="legend-title">
+      <div className="legend-head">
+        {/* The title toggles too (a bigger target); the button is the accessible control. */}
+        <span id="legend-title" className="eyebrow" onClick={() => setOpen((o) => !o)}>
           Stage of review
         </span>
-        <span className="chevron" aria-hidden="true">
+        <button
+          type="button"
+          className="icon-button"
+          aria-expanded={open}
+          aria-controls="legend-body"
+          aria-label={open ? 'Collapse the map key' : 'Expand the map key'}
+          onClick={() => setOpen((o) => !o)}
+        >
           {open ? '−' : '+'}
-        </span>
-      </button>
+        </button>
+      </div>
       {open && (
-        <>
+        <div id="legend-body" className="legend-body">
           <ul className="legend-list stages" aria-label="Stages shown on the map">
             {STATUSES.map((s) => {
               const on = stages.includes(s.id);
@@ -94,7 +102,7 @@ export function Legend({ meta, mode, scope, stages, onStages }: Props) {
               not shown.
             </p>
           )}
-        </>
+        </div>
       )}
     </section>
   );
