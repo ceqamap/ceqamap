@@ -34,7 +34,7 @@ export function Legend({ meta, mode, scope, stages, onStages }: Props) {
         </span>
         <button
           type="button"
-          className="icon-button"
+          className="map-button"
           aria-expanded={open}
           aria-controls="legend-body"
           aria-label={open ? 'Collapse the map key' : 'Expand the map key'}

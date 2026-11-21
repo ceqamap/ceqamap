@@ -57,13 +57,13 @@ export function Controls({ basemap, onBasemap, onZoomIn, onZoomOut, onReset }: P
         </div>
       )}
       <div className="zoom-group card">
-        <button className="icon-button" aria-label="Zoom in" onClick={onZoomIn}>
+        <button className="map-button" aria-label="Zoom in" onClick={onZoomIn}>
           +
         </button>
-        <button className="icon-button" aria-label="Zoom out" onClick={onZoomOut}>
+        <button className="map-button" aria-label="Zoom out" onClick={onZoomOut}>
           −
         </button>
-        <button className="icon-button" aria-label="Show all of California" onClick={onReset}>
+        <button className="map-button" aria-label="Show all of California" onClick={onReset}>
           <ResetIcon />
         </button>
       </div>

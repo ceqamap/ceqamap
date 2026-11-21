@@ -372,8 +372,9 @@ a {
   border-radius: var(--radius-pill);
   padding: 2px;
 }
-/* Round icon button with a quiet paper hover: map zoom controls, legend toggle. */
-.icon-button {
+/* Round icon button with a quiet paper hover: map zoom controls, legend toggle.
+   (The drawer's outlined close button is .icon-button.) */
+.map-button {
   display: grid;
   flex: none;
   place-items: center;
@@ -386,7 +387,7 @@ a {
   font-size: 18px;
   line-height: 1;
 }
-.icon-button:hover {
+.map-button:hover {
   background: var(--paper);
 }
 
