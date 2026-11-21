@@ -992,29 +992,35 @@ a {
 .maplibregl-ctrl-attrib-button::after {
   content: '';
   position: absolute;
-  left: calc(50% - 1px);
-  width: 2px;
-  border-radius: 1px;
+  left: calc(50% - 0.75px);
+  width: 1.5px; /* crisp, square-ended strokes, like the + and − glyphs */
   background: var(--card);
-  transition: transform 320ms var(--ease);
+  /* Length and position animate (not a scale), so the strokes stay sharp. */
+  transition:
+    top 320ms var(--ease),
+    height 320ms var(--ease),
+    transform 320ms var(--ease);
 }
 /* Stem of the "i"; one stroke of the "x". */
 .maplibregl-ctrl-attrib-button::before {
-  top: calc(50% - 3.5px);
-  height: 7px;
-  transform: translateY(1.5px);
+  top: calc(50% - 1.5px);
+  height: 6px;
 }
 /* Dot of the "i"; the other stroke of the "x". */
 .maplibregl-ctrl-attrib-button::after {
-  top: calc(50% - 1px);
-  height: 2px;
-  transform: translateY(-4px);
+  top: calc(50% - 4.75px);
+  height: 1.5px;
+}
+.maplibregl-compact-show .maplibregl-ctrl-attrib-button::before,
+.maplibregl-compact-show .maplibregl-ctrl-attrib-button::after {
+  top: calc(50% - 4.5px);
+  height: 9px;
 }
 .maplibregl-compact-show .maplibregl-ctrl-attrib-button::before {
-  transform: rotate(45deg) scaleY(1.45);
+  transform: rotate(45deg);
 }
 .maplibregl-compact-show .maplibregl-ctrl-attrib-button::after {
-  transform: rotate(-45deg) scaleY(5);
+  transform: rotate(-45deg);
 }
 /* MapLibre draws a blue glow on :focus, so it shows after every mouse click.
    Keep only the site's own focus ring, which browsers show for keyboard focus. */
