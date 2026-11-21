@@ -9,7 +9,7 @@ on:
       script:
         description: 'Script in pipeline/scripts to run'
         type: choice
-        options: [match-intersections, profile-locations]
+        options: [match-intersections, profile-locations, match-landmarks]
         default: match-intersections
 
 concurrency:
@@ -50,5 +50,8 @@ jobs:
           key: boundaries-${{ hashFiles('pipeline/scripts/fetch-boundaries.ts', 'pipeline/src/lib/boundaries.ts', 'pipeline/src/lib/geometry.ts', 'pipeline/src/lib/shapefile.ts') }}
       - name: Ensure city, county and ZIP boundaries
         run: node pipeline/scripts/boundaries-current.ts || NODE_OPTIONS=--max-old-space-size=8192 pnpm --filter @ceqa-atlas/pipeline boundaries
+      - name: Fetch GNIS names
+        if: inputs.script == 'match-landmarks'
+        run: node pipeline/scripts/fetch-gnis.ts
       - name: Run
         run: node --max-old-space-size=6144 pipeline/scripts/${{ inputs.script || 'match-intersections' }}.ts
