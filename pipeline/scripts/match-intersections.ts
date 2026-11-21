@@ -159,7 +159,7 @@ for (const [county, reqs] of byCounty) {
   for (const r of pending)
     for (const n of r.names) {
       const k = streetKeys(n);
-      if (k) wanted.add(k.full).add(k.base);
+      if (k) wanted.add(k.full).add(k.nodir).add(k.base);
     }
   const roads = await countyRoads(fipsOf.get(county)!);
   if (!roads) continue;

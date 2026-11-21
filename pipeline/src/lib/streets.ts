@@ -9,11 +9,11 @@
  */
 
 const SUFFIX: Record<string, string> = {
-  road: 'rd', rd: 'rd',
+  road: 'rd', rd: 'rd', rod: 'rd',
   street: 'st', str: 'st', st: 'st',
   avenue: 'ave', av: 'ave', ave: 'ave',
   boulevard: 'blvd', blvd: 'blvd', blv: 'blvd',
-  drive: 'dr', dr: 'dr',
+  drive: 'dr', dr: 'dr', drv: 'dr', driv: 'dr',
   lane: 'ln', ln: 'ln',
   court: 'ct', ct: 'ct',
   place: 'pl', pl: 'pl',
@@ -39,6 +39,17 @@ const ORDINAL: Record<string, string> = {
   sixth: '6th', seventh: '7th', eighth: '8th', ninth: '9th', tenth: '10th',
 };
 
+/**
+ * Well-known local names for roads whose Census name differs. Keys and
+ * values are token strings after lowercasing.
+ */
+const ALIASES: Record<string, string> = {
+  pch: 'rte 1',
+  'pacific coast hwy': 'rte 1',
+  'pacific coast highway': 'rte 1',
+  'el camino': 'el camino real',
+};
+
 /** Suffix tokens dropped to make the "base" key (e.g. "olive mill"). */
 const DROPPABLE_SUFFIX = new Set(['rd', 'st', 'ave', 'blvd', 'dr', 'ln', 'ct', 'pl', 'pkwy', 'cir', 'ter', 'trl', 'way']);
 
@@ -61,7 +72,10 @@ function routeKey(t: string[]): string | null {
   const s = t.join(' ');
   let m = s.match(/^(?:i|interstate)\s*(\d{1,3})(?:\s|$)/);
   if (m) return `i ${Number(m[1])}`;
-  m = s.match(/^(?:state\s+(?:rte|route|highway|hwy)|sr|ca|hwy|highway|route|rte|us\s+(?:hwy|highway|route|rte)|us)\s*(\d{1,3})(?:\s|$)/);
+  // "SR 299E", "Hwy 46 East": a trailing direction letter or word is not part of the route number.
+  m = s.match(
+    /^(?:state\s+(?:rte|route|highway|hwy)|sr|ca|hwy|highway|route|rte|us\s+(?:hwy|highway|route|rte)|us)\s*(\d{1,3})(?:[nsew]|\s|$)/,
+  );
   if (m) return `rte ${Number(m[1])}`;
   return null;
 }
@@ -69,6 +83,8 @@ function routeKey(t: string[]): string | null {
 export interface StreetKeys {
   /** e.g. "olive mill rd", "n 1st st", "rte 101" */
   full: string;
+  /** without a leading direction, e.g. "1st st" (W Olive Ave = Olive Ave) */
+  nodir: string;
   /** without suffix and leading direction, e.g. "olive mill", "1st" */
   base: string;
 }
@@ -76,8 +92,10 @@ export interface StreetKeys {
 export function streetKeys(name: string): StreetKeys | null {
   let t = tokens(name);
   if (t.length === 0) return null;
+  const alias = ALIASES[t.join(' ')];
+  if (alias) t = alias.split(' ');
   const route = routeKey(t);
-  if (route) return { full: route, base: route };
+  if (route) return { full: route, nodir: route, base: route };
   if (t.length === 1 && (SUFFIX[t[0]] || DIRECTION[t[0]])) return null; // "St", "Road", "North" alone
   t = t.map((w, i) => {
     if (ORDINAL[w]) return ORDINAL[w];
@@ -88,13 +106,14 @@ export function streetKeys(name: string): StreetKeys | null {
     return w;
   });
   const full = t.join(' ');
+  const nodir = t.length > 1 && ['n', 's', 'e', 'w'].includes(t[0]) ? t.slice(1).join(' ') : full;
   let b = [...t];
   if (b.length > 1 && DROPPABLE_SUFFIX.has(b[b.length - 1])) b = b.slice(0, -1);
   if (b.length > 1 && ['n', 's', 'e', 'w'].includes(b[0])) b = b.slice(1);
   const base = b.join(' ');
   // A bare suffix or number on its own is too ambiguous to be a street.
   if (!/[a-z]{2}/.test(base) && !/^\d+(st|nd|rd|th)$/.test(base)) return null;
-  return { full, base };
+  return { full, nodir, base };
 }
 
 const VAGUE = /\b(various|multiple|several|numerous|n\/?a|none|unknown|see (attached|map|below|above)|throughout|countywide|citywide|statewide|regionwide|tbd|not applicable)\b/i;

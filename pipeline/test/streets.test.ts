@@ -22,6 +22,14 @@ describe('streetKeys', () => {
     same('Interstate 5', 'I- 5');
     assert.notEqual(streetKeys('I-5')?.full, streetKeys('SR 5')?.full);
   });
+  it('knows common local names and abbreviations', () => {
+    same('PCH', 'State Rte 1');
+    same('Pacific Coast Highway', 'State Rte 1');
+    same('El Camino', 'El Camino Real');
+    same('Trade Center Drv', 'Trade Center Dr');
+    same('SR 299E', 'State Rte 299');
+  });
+
   it('drops the suffix and direction for a fallback key', () => {
     assert.equal(streetKeys('Olive Mill')?.base, streetKeys('Olive Mill Rd')?.base);
     assert.equal(streetKeys('W Main St')?.base, 'main');
@@ -67,6 +75,48 @@ describe('findIntersection', () => {
   const wanted = new Set(['olive mill rd', 'olive mill', 'hot springs rd', 'hot springs', 'main st', 'main', '1st st', '1st']);
   const index = buildRoadIndex(roads, wanted);
   const rect = (w: number, s: number, e: number, n: number): Ring => [[w, s], [e, s], [e, n], [w, n], [w, s]];
+
+  it('matches a name with or without a leading direction (Olive Ave vs W Olive Ave)', () => {
+    const idx = buildRoadIndex(
+      [
+        road('W Olive Ave', [-118.34, 34.18], [-118.33, 34.18], [-118.32, 34.18]),
+        road('Olive Ave', [-117.0, 33.0], [-117.0, 33.1]), // a different Olive Ave elsewhere
+        road('Hollywood Way', [-118.33, 34.17], [-118.33, 34.18], [-118.33, 34.19]),
+      ],
+      new Set(['olive ave', 'olive', 'hollywood way', 'hollywood']),
+    );
+    const r = findIntersection(idx, ['OLIVE AVE', 'HOLLYWOOD WAY'], {});
+    assert.equal(r.ok && r.lat, 34.18);
+  });
+
+  it('prefers the exact name over a different road type with the same base name', () => {
+    const idx = buildRoadIndex(
+      [
+        road('Olive Ave', [-118.0, 34.0], [-118.0, 34.1]),
+        road('Olive St', [-118.2, 34.0], [-118.2, 34.1]),
+        road('Cherry Ln', [-118.3, 34.05], [-117.9, 34.05]),
+      ],
+      new Set(['olive st', 'olive', 'cherry ln', 'cherry']),
+    );
+    const r = findIntersection(idx, ['Olive St', 'Cherry Ln'], {});
+    assert.equal(r.ok && r.lon, -118.2);
+  });
+
+  it('finds crossings with no shared vertex (overpasses)', () => {
+    const idx = buildRoadIndex(
+      [road('US Hwy 101', [-122.0, 37.0], [-122.0, 37.2]), road('Becker Ln', [-122.1, 37.1], [-121.9, 37.1])],
+      new Set(['rte 101', 'becker ln', 'becker']),
+    );
+    const r = findIntersection(idx, ['Highway 101', 'Becker Lane'], {});
+    assert.ok(r.ok);
+    assert.ok(Math.abs((r as { lat: number }).lat - 37.1) < 1e-9);
+  });
+
+  it('accepts a single crossing just outside the listed city', () => {
+    const city = toArea('Near', [rect(-119.7, 34.3, -119.65, 34.35)]);
+    const r = findIntersection(index, ['Olive Mill Rd', 'Hot Springs Rd'], { city });
+    assert.ok(r.ok);
+  });
 
   it('finds the shared vertex of two named roads', () => {
     const r = findIntersection(index, ['Olive Mill Rd.', 'Hot Springs Road'], {});
