@@ -98,7 +98,12 @@ export function crossings(a: Line[], b: Line[]): { lon: number; lat: number }[] 
       for (let i = 1; i < la.coords.length; i++) {
         const p1 = la.coords[i - 1];
         const p2 = la.coords[i];
-        const sb: BBox = [Math.min(p1[0], p2[0]), Math.min(p1[1], p2[1]), Math.max(p1[0], p2[0]), Math.max(p1[1], p2[1])];
+        const sb: BBox = [
+          Math.min(p1[0], p2[0]),
+          Math.min(p1[1], p2[1]),
+          Math.max(p1[0], p2[0]),
+          Math.max(p1[1], p2[1]),
+        ];
         if (!overlaps(sb, lb.bbox)) continue;
         for (let j = 1; j < lb.coords.length; j++) {
           const x = segmentCrossing(p1, p2, lb.coords[j - 1], lb.coords[j]);

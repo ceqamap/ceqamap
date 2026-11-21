@@ -72,9 +72,24 @@ describe('findIntersection', () => {
     road('Main St', [-121.0, 36.0], [-121.0, 36.01]),
     road('1st St', [-121.01, 36.0], [-121.0, 36.0]),
   ];
-  const wanted = new Set(['olive mill rd', 'olive mill', 'hot springs rd', 'hot springs', 'main st', 'main', '1st st', '1st']);
+  const wanted = new Set([
+    'olive mill rd',
+    'olive mill',
+    'hot springs rd',
+    'hot springs',
+    'main st',
+    'main',
+    '1st st',
+    '1st',
+  ]);
   const index = buildRoadIndex(roads, wanted);
-  const rect = (w: number, s: number, e: number, n: number): Ring => [[w, s], [e, s], [e, n], [w, n], [w, s]];
+  const rect = (w: number, s: number, e: number, n: number): Ring => [
+    [w, s],
+    [e, s],
+    [e, n],
+    [w, n],
+    [w, s],
+  ];
 
   it('matches a name with or without a leading direction (Olive Ave vs W Olive Ave)', () => {
     const idx = buildRoadIndex(

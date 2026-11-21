@@ -36,10 +36,18 @@ for (const [sch, list] of groupBySch(docs)) {
   if (!req) continue;
   requests.push(req);
   if (loc) before.set(sch, loc);
-  text.set(sch, newestFirst.find((d) => d.crossStreets.trim())!.crossStreets.replace(/\s+/g, ' ').trim());
+  text.set(
+    sch,
+    newestFirst
+      .find((d) => d.crossStreets.trim())!
+      .crossStreets.replace(/\s+/g, ' ')
+      .trim(),
+  );
 }
 
-const { placements, stats } = await placeAtCrossStreets(requests, boundaries, (c) => countyRoads(tigerDir, fips.get(c)!));
+const { placements, stats } = await placeAtCrossStreets(requests, boundaries, (c) =>
+  countyRoads(tigerDir, fips.get(c)!),
+);
 console.log('\n=== Cross-street placement report ===');
 console.log(JSON.stringify(stats));
 const moved = [...placements].filter(([s]) => before.has(s)).map(([s, p]) => haversineKm(before.get(s)!, p));
@@ -51,5 +59,8 @@ console.log('\n--- Sample matches ---');
 for (const [sch, p] of sample([...placements], 30))
   console.log(`${sch} | ${text.get(sch)!.slice(0, 70)} | ${p.lat.toFixed(5)},${p.lon.toFixed(5)}`);
 console.log('\n--- Sample unmatched ---');
-for (const r of sample(requests.filter((r) => !placements.has(r.sch)), 30))
+for (const r of sample(
+  requests.filter((r) => !placements.has(r.sch)),
+  30,
+))
   console.log(`${r.sch} | ${text.get(r.sch)!.slice(0, 70)} | parsed: ${r.names.join(' + ')} | ${r.city?.name ?? '-'}`);

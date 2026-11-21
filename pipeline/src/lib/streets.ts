@@ -9,34 +9,75 @@
  */
 
 const SUFFIX: Record<string, string> = {
-  road: 'rd', rd: 'rd', rod: 'rd',
-  street: 'st', str: 'st', st: 'st',
-  avenue: 'ave', av: 'ave', ave: 'ave',
-  boulevard: 'blvd', blvd: 'blvd', blv: 'blvd',
-  drive: 'dr', dr: 'dr', drv: 'dr', driv: 'dr',
-  lane: 'ln', ln: 'ln',
-  court: 'ct', ct: 'ct',
-  place: 'pl', pl: 'pl',
-  parkway: 'pkwy', pkwy: 'pkwy', pky: 'pkwy',
-  circle: 'cir', cir: 'cir',
-  terrace: 'ter', ter: 'ter',
-  trail: 'trl', trl: 'trl',
+  road: 'rd',
+  rd: 'rd',
+  rod: 'rd',
+  street: 'st',
+  str: 'st',
+  st: 'st',
+  avenue: 'ave',
+  av: 'ave',
+  ave: 'ave',
+  boulevard: 'blvd',
+  blvd: 'blvd',
+  blv: 'blvd',
+  drive: 'dr',
+  dr: 'dr',
+  drv: 'dr',
+  driv: 'dr',
+  lane: 'ln',
+  ln: 'ln',
+  court: 'ct',
+  ct: 'ct',
+  place: 'pl',
+  pl: 'pl',
+  parkway: 'pkwy',
+  pkwy: 'pkwy',
+  pky: 'pkwy',
+  circle: 'cir',
+  cir: 'cir',
+  terrace: 'ter',
+  ter: 'ter',
+  trail: 'trl',
+  trl: 'trl',
   way: 'way',
-  highway: 'hwy', hwy: 'hwy', hiway: 'hwy',
-  freeway: 'fwy', fwy: 'fwy',
-  expressway: 'expy', expy: 'expy', expwy: 'expy',
-  square: 'sq', sq: 'sq',
+  highway: 'hwy',
+  hwy: 'hwy',
+  hiway: 'hwy',
+  freeway: 'fwy',
+  fwy: 'fwy',
+  expressway: 'expy',
+  expy: 'expy',
+  expwy: 'expy',
+  square: 'sq',
+  sq: 'sq',
   loop: 'loop',
-  alley: 'aly', aly: 'aly',
+  alley: 'aly',
+  aly: 'aly',
 };
 
 const DIRECTION: Record<string, string> = {
-  north: 'n', n: 'n', south: 's', s: 's', east: 'e', e: 'e', west: 'w', w: 'w',
+  north: 'n',
+  n: 'n',
+  south: 's',
+  s: 's',
+  east: 'e',
+  e: 'e',
+  west: 'w',
+  w: 'w',
 };
 
 const ORDINAL: Record<string, string> = {
-  first: '1st', second: '2nd', third: '3rd', fourth: '4th', fifth: '5th',
-  sixth: '6th', seventh: '7th', eighth: '8th', ninth: '9th', tenth: '10th',
+  first: '1st',
+  second: '2nd',
+  third: '3rd',
+  fourth: '4th',
+  fifth: '5th',
+  sixth: '6th',
+  seventh: '7th',
+  eighth: '8th',
+  ninth: '9th',
+  tenth: '10th',
 };
 
 /**
@@ -51,7 +92,21 @@ const ALIASES: Record<string, string> = {
 };
 
 /** Suffix tokens dropped to make the "base" key (e.g. "olive mill"). */
-const DROPPABLE_SUFFIX = new Set(['rd', 'st', 'ave', 'blvd', 'dr', 'ln', 'ct', 'pl', 'pkwy', 'cir', 'ter', 'trl', 'way']);
+const DROPPABLE_SUFFIX = new Set([
+  'rd',
+  'st',
+  'ave',
+  'blvd',
+  'dr',
+  'ln',
+  'ct',
+  'pl',
+  'pkwy',
+  'cir',
+  'ter',
+  'trl',
+  'way',
+]);
 
 function tokens(name: string): string[] {
   return name
@@ -116,8 +171,10 @@ export function streetKeys(name: string): StreetKeys | null {
   return { full, nodir, base };
 }
 
-const VAGUE = /\b(various|multiple|several|numerous|n\/?a|none|unknown|see (attached|map|below|above)|throughout|countywide|citywide|statewide|regionwide|tbd|not applicable)\b/i;
-const FILLER = /\b(intersection of|corner of|(?:north|south|east|west|n|s|e|w)\s+of|near|adjacent to|between|along|located (?:at|on)|at the|the)\b/gi;
+const VAGUE =
+  /\b(various|multiple|several|numerous|n\/?a|none|unknown|see (attached|map|below|above)|throughout|countywide|citywide|statewide|regionwide|tbd|not applicable)\b/i;
+const FILLER =
+  /\b(intersection of|corner of|(?:north|south|east|west|n|s|e|w)\s+of|near|adjacent to|between|along|located (?:at|on)|at the|the)\b/gi;
 
 /**
  * Pull up to four street names out of a "Cross Streets" field. Returns []
@@ -125,7 +182,10 @@ const FILLER = /\b(intersection of|corner of|(?:north|south|east|west|n|s|e|w)\s
  */
 export function parseCrossStreets(text: string | null | undefined): string[] {
   if (!text) return [];
-  const t = text.replace(/\(.*?\)/g, ' ').replace(/\s+/g, ' ').trim();
+  const t = text
+    .replace(/\(.*?\)/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (!t || VAGUE.test(t)) return [];
   const parts = t
     .replace(FILLER, ' ; ')

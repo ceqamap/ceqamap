@@ -37,14 +37,14 @@ Also observed: rapid back‑to‑back requests sometimes return an **empty** 200
 
 Each project gets the best location available, in this order:
 
-| Precision | Source                                                                 | On the map          |
-| --------- | ---------------------------------------------------------------------- | ------------------- |
-| Exact     | Coordinates typed by the lead agency, if consistent with listed county | Solid dot           |
-| Cross streets | Where the listed cross streets meet (Census road network)            | Dot, lighter center |
-| City      | A seeded random spot inside the listed city (Census outline)           | Hollow ring         |
-| County    | A seeded random spot inside the listed county (Census outline)         | Hollow ring         |
-| Region    | Inside one of 2–3 neighboring listed counties                          | Hollow ring         |
-| None      | Statewide, or counties far apart                                       | Not mapped; counted |
+| Precision     | Source                                                                 | On the map          |
+| ------------- | ---------------------------------------------------------------------- | ------------------- |
+| Exact         | Coordinates typed by the lead agency, if consistent with listed county | Solid dot           |
+| Cross streets | Where the listed cross streets meet (Census road network)              | Dot, lighter center |
+| City          | A seeded random spot inside the listed city (Census outline)           | Hollow ring         |
+| County        | A seeded random spot inside the listed county (Census outline)         | Hollow ring         |
+| Region        | Inside one of 2–3 neighboring listed counties                          | Hollow ring         |
+| None          | Statewide, or counties far apart                                       | Not mapped; counted |
 
 Only about 11% of projects (38,000 of 335,000) have agency coordinates; nothing before roughly 2010 does.
 **Most points on the map are approximate**, and say so with a hollow ring and a line in the drawer.

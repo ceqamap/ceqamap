@@ -198,12 +198,20 @@ describe('resolveLocation', () => {
   it('uses a cross-street placement ahead of city or county guesses', () => {
     const hint = { lon: -122.37, lat: 40.6, streets: ['Market St', 'Shasta St'] as [string, string] };
     const r = resolveLocation('x', [doc({ cities: ['Redding'] })], B, { crossStreets: hint });
-    assert.deepEqual(r, { lon: -122.37, lat: 40.6, precision: 'intersection', coordinatesRejected: false, streets: hint.streets });
+    assert.deepEqual(r, {
+      lon: -122.37,
+      lat: 40.6,
+      precision: 'intersection',
+      coordinatesRejected: false,
+      streets: hint.streets,
+    });
   });
 
   it('prefers valid agency coordinates over a cross-street placement', () => {
     const hint = { lon: -122.37, lat: 40.6, streets: ['A St', 'B St'] as [string, string] };
-    const r = resolveLocation('x', [doc({ coordinates: '40.58, -122.39', cities: ['Redding'] })], B, { crossStreets: hint });
+    const r = resolveLocation('x', [doc({ coordinates: '40.58, -122.39', cities: ['Redding'] })], B, {
+      crossStreets: hint,
+    });
     assert.equal(r?.precision, 'exact');
   });
 
@@ -340,8 +348,12 @@ describe('aggregate', () => {
   });
 
   it('marks cross-street placements with their own symbol and counts them', () => {
-    const docs = [doc({ sch: '1999011038', type: 'NOD', cities: [], counties: ['Shasta'], crossStreets: 'A St and B St' })];
-    const placements = new Map([['1999011038', { lon: -122.2, lat: 40.7, streets: ['A St', 'B St'] as [string, string] }]]);
+    const docs = [
+      doc({ sch: '1999011038', type: 'NOD', cities: [], counties: ['Shasta'], crossStreets: 'A St and B St' }),
+    ];
+    const placements = new Map([
+      ['1999011038', { lon: -122.2, lat: 40.7, streets: ['A St', 'B St'] as [string, string] }],
+    ]);
     const r = aggregate(docs, B, TODAY, '2026-11-18T00:00:00Z', placements);
     assert.equal(r.points[0].properties.x, 2);
     assert.equal(r.counts.byPrecision.intersection, 1);
