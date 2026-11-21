@@ -164,7 +164,7 @@ a {
 
 .live {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   margin: 0;
   padding-top: 10px;
@@ -189,6 +189,7 @@ a {
 .live-dot {
   position: relative;
   flex: none;
+  margin-top: 6px; /* centered on the first line of text */
   width: 7px;
   height: 7px;
   border-radius: 50%;
@@ -206,9 +207,11 @@ a {
 
 .live-text {
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  white-space: pre;
+  flex-direction: column;
+  gap: 1px;
+}
+.live-line {
+  white-space: nowrap;
 }
 .arrivals-link {
   padding: 0;
@@ -241,6 +244,8 @@ a {
   text-decoration: underline;
   text-decoration-color: var(--line-strong);
   text-underline-offset: 2px;
+  /* Size to the chosen option, so the chevron sits right after it. */
+  field-sizing: content;
 }
 .scope-select select:hover {
   text-decoration-color: currentColor;

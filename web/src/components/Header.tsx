@@ -16,7 +16,9 @@ interface Props {
   scope: TimeScope;
   stages: readonly ProjectStatus[];
   onScope: (scope: TimeScope) => void;
-  onShowArrivals: (places: { lon: number; lat: number }[]) => void;
+  /** Position in the tour of arrivals (null before the first click). */
+  arrivalIndex: number | null;
+  onNextArrival: () => void;
 }
 
 /** Start the live dot's ping in step with the map's arrival pings (see lib/motion.ts). */
@@ -27,7 +29,7 @@ function syncPing(el: HTMLElement | null) {
   }
 }
 
-export function Header({ meta, status, scope, stages, onScope, onShowArrivals }: Props) {
+export function Header({ meta, status, scope, stages, onScope, arrivalIndex, onNextArrival }: Props) {
   // Re-render every minute so "updated N minutes ago" stays honest.
   const [, setTick] = useState(0);
   useEffect(() => {
@@ -36,7 +38,7 @@ export function Header({ meta, status, scope, stages, onScope, onShowArrivals }:
   }, []);
 
   const arrivals = meta?.arrivals;
-  const places = arrivals?.items.flatMap((i) => (i.lon !== null && i.lat !== null ? [{ lon: i.lon, lat: i.lat }] : []));
+  const mapped = arrivals?.items.filter((i) => i.lon !== null && i.lat !== null).length ?? 0;
 
   return (
     <header className="header card">
@@ -52,40 +54,45 @@ export function Header({ meta, status, scope, stages, onScope, onShowArrivals }:
           <>
             <span className="live-dot" ref={syncPing} aria-hidden="true" />
             <span className="live-text">
-              <span>Updated {timeAgo(meta.builtAt)}</span>
-              {arrivals && places && places.length > 0 && (
-                <>
-                  <span aria-hidden="true"> · </span>
-                  <button
-                    type="button"
-                    className="arrivals-link"
-                    onClick={() => onShowArrivals(places)}
-                    title={arrivalsTitle(arrivals)}
-                  >
-                    {formatNumber(arrivals.items.length)} new
-                  </button>
-                </>
-              )}
-              <span aria-hidden="true"> · </span>
-              <span>{formatNumber(shownCount(meta, scope, stages))} projects</span>
-              {meta.scopes && (
-                <>
-                  <span aria-hidden="true"> · </span>
-                  <label className="scope-select">
-                    <span className="visually-hidden">Show projects with filings in</span>
-                    <select value={scope} onChange={(e) => onScope(e.target.value as TimeScope)}>
-                      {TIME_SCOPES.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.label}
-                        </option>
-                      ))}
-                    </select>
-                    <span className="scope-chevron" aria-hidden="true">
-                      ▾
-                    </span>
-                  </label>
-                </>
-              )}
+              <span className="live-line">
+                Updated {timeAgo(meta.builtAt)}
+                {arrivals && mapped > 0 && (
+                  <>
+                    {' · '}
+                    <button
+                      type="button"
+                      className="arrivals-link"
+                      onClick={onNextArrival}
+                      title={arrivalsTitle(arrivals)}
+                    >
+                      {arrivalIndex === null
+                        ? `${formatNumber(arrivals.items.length)} new`
+                        : `${arrivalIndex + 1} of ${formatNumber(mapped)} new ›`}
+                    </button>
+                  </>
+                )}
+              </span>
+              <span className="live-line">
+                {formatNumber(shownCount(meta, scope, stages))} projects
+                {meta.scopes && (
+                  <>
+                    {' · '}
+                    <label className="scope-select">
+                      <span className="visually-hidden">Show projects with filings in</span>
+                      <select value={scope} onChange={(e) => onScope(e.target.value as TimeScope)}>
+                        {TIME_SCOPES.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.label}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="scope-chevron" aria-hidden="true">
+                        ▾
+                      </span>
+                    </label>
+                  </>
+                )}
+              </span>
             </span>
           </>
         ) : (
@@ -100,5 +107,5 @@ function arrivalsTitle(a: NonNullable<PublishedMeta['arrivals']>): string {
   const parts = [];
   if (a.projects) parts.push(`${formatNumber(a.projects)} new project${a.projects === 1 ? '' : 's'}`);
   if (a.filings) parts.push(`${formatNumber(a.filings)} new filing${a.filings === 1 ? '' : 's'} on existing projects`);
-  return `${parts.join(' and ')}, first seen ${timeAgo(a.at)}. Show them on the map.`;
+  return `${parts.join(' and ')}, first seen ${timeAgo(a.at)}. Click to visit them one by one.`;
 }

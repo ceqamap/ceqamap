@@ -114,6 +114,24 @@ export function App() {
     writeParam('stages', params.stages, false);
   }, []);
 
+  // "N new" in the header steps through the latest arrivals, one project at a
+  // time: fly there and open it. (They are spread across the state, so framing
+  // them all at once mostly shows California.)
+  const [arrivalIndex, setArrivalIndex] = useState<number | null>(null);
+  const mappedArrivals = useMemo(
+    () => meta?.arrivals?.items.filter((i) => i.lon !== null && i.lat !== null) ?? [],
+    [meta?.arrivals],
+  );
+  useEffect(() => setArrivalIndex(null), [meta?.arrivals?.at]);
+  const nextArrival = useCallback(() => {
+    if (mappedArrivals.length === 0) return;
+    const i = arrivalIndex === null ? 0 : (arrivalIndex + 1) % mappedArrivals.length;
+    const item = mappedArrivals[i];
+    setArrivalIndex(i);
+    map.current?.showPlaces([{ lon: item.lon!, lat: item.lat! }]);
+    select(item.id);
+  }, [arrivalIndex, mappedArrivals, select]);
+
   // Latest values for callbacks that should not re-run on every filter change.
   const current = useRef({ scope, stages, meta });
   current.current = { scope, stages, meta };
@@ -172,7 +190,8 @@ export function App() {
         scope={scope}
         stages={stages}
         onScope={(t) => changeFilters(t, stages)}
-        onShowArrivals={(places) => map.current?.showPlaces(places)}
+        arrivalIndex={arrivalIndex}
+        onNextArrival={nextArrival}
       />
       <Controls
         basemap={basemapId}
