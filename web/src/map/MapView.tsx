@@ -203,7 +203,11 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
           map!.setPaintProperty(LAYER.pulse, 'circle-opacity', 0.35 * (1 - phase));
           if (map!.getLayer(LAYER.arrivals)) {
             const ping = pingProgress(t);
-            map!.setPaintProperty(LAYER.arrivals, 'circle-radius', arrivalRadius(latest.current.stages, ping, latest.current.selected));
+            map!.setPaintProperty(
+              LAYER.arrivals,
+              'circle-radius',
+              arrivalRadius(latest.current.stages, ping, latest.current.selected),
+            );
             map!.setPaintProperty(LAYER.arrivals, 'circle-stroke-opacity', arrivalOpacity(ping));
           }
         };
