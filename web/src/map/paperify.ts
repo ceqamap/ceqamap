@@ -121,6 +121,23 @@ export function paperify(style: StyleSpecification, palette: 'paper' | 'night'):
     }
     return { ...layer, paint } as LayerSpecification;
   });
+  // OpenFreeMap Dark has no layer for the `park` source layer (Golden Gate
+  // Park, state and national parks), which Positron draws. Add one for Night,
+  // just above the land-use layers.
+  if (palette === 'night' && !layers.some((l) => (l as { 'source-layer'?: string })['source-layer'] === 'park')) {
+    const source = Object.keys(style.sources).find((k) => k === 'openmaptiles');
+    const after = layers.findIndex((l) => l.id === 'landuse_park');
+    if (source && after >= 0) {
+      layers.splice(after + 1, 0, {
+        id: 'park',
+        type: 'fill',
+        source,
+        'source-layer': 'park',
+        filter: ['match', ['geometry-type'], ['MultiPolygon', 'Polygon'], true, false],
+        paint: { 'fill-color': p.green },
+      } as LayerSpecification);
+    }
+  }
   // Points of interest compete with our data; hide their icons and labels.
   const quiet = layers.map((l) =>
     /poi|aerodrome|airport_label|housenumber/.test(l.id)
