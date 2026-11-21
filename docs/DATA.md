@@ -63,6 +63,9 @@ How placement works, and why (lessons from the first full build, 2026‑11‑20)
   (25 km of California when no county is listed). Otherwise they are treated as a typo, the project is placed by
   city or county, and the drawer explains why. Example: SCH 2024050310 near Ukiah was filed as 36°12′N instead of
   about 39°12′N, which is 330 km south and out to sea. `meta.json` reports how many were rejected.
+- **No points across a land border.** The 5 km allowance is for the ocean off coastal counties, so coordinates
+  (and geocoded addresses) in Mexico, Oregon, Nevada or Arizona are always rejected. Example: SCH 2011081008, a
+  Poway Road bike path, was filed as 32°30′N instead of about 32°57′N, which is 1 km inside Tijuana.
 
 **Cross streets.** About 86,000 approximate projects have text in "Cross Streets", and 58,000 of those name two or
 more streets. `pipeline/src/lib/crossStreets.ts` matches those names against Census TIGER/Line roads (public domain)

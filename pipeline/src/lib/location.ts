@@ -169,6 +169,11 @@ export function listedPlaces(docsNewestFirst: readonly CeqaDocument[], b: Bounda
  * California.
  */
 export function agreesWithPlaces(p: { lon: number; lat: number }, places: ListedPlaces, b: Boundaries): boolean {
+  // The tolerances let points sit in the ocean off a coastal county, but not
+  // across a land border: SCH 2011081008 (Poway Road, filed as 32°30′N
+  // instead of about 32°57′N) landed 1 km inside Tijuana, within 5 km of San
+  // Diego County.
+  if (inMexico(p.lon, p.lat) || inNeighborState(p.lon, p.lat, b)) return false;
   return places.cityAreas
     ? nearAny(p.lon, p.lat, places.cityAreas, CITY_TOLERANCE_KM)
     : places.countyAreas
@@ -256,4 +261,20 @@ function placeInZip(
     if (!within || within.some((a) => inBBox(p.lon, p.lat, a.bbox) && pointInShape(p.lon, p.lat, a.shape))) return p;
   }
   return null;
+}
+
+// The California-Mexico border is a straight line from the Pacific, just south
+// of San Diego Bay, to the Colorado River.
+const BORDER_WEST = { lon: -117.1240, lat: 32.5343 };
+const BORDER_EAST = { lon: -114.7196, lat: 32.7187 };
+
+/** South of the international border (land or Mexican coastal waters) and west of Arizona. */
+export function inMexico(lon: number, lat: number): boolean {
+  if (lon < -118 || lon > BORDER_EAST.lon) return false;
+  const t = (lon - BORDER_WEST.lon) / (BORDER_EAST.lon - BORDER_WEST.lon);
+  return lat < BORDER_WEST.lat + t * (BORDER_EAST.lat - BORDER_WEST.lat);
+}
+
+function inNeighborState(lon: number, lat: number, b: Boundaries): boolean {
+  return (b.neighbors ?? []).some((a) => inBBox(lon, lat, a.bbox) && pointInShape(lon, lat, a.shape));
 }

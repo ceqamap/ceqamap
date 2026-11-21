@@ -3,8 +3,8 @@ name: Bootstrap
 # One-time setup that needs the open internet: generates pnpm-lock.yaml (exact
 # dependency versions) and the Census city/county boundaries, applies the code
 # formatter, then commits the result.
-# Runs automatically on the first push and does nothing once they exist.
-# Safe to delete after it has run.
+# Runs on every push to main; does nothing unless the lockfile is missing or the
+# boundaries file is missing or out of date (see BOUNDARIES_FORMAT).
 on:
   push:
     branches: [main]
@@ -19,17 +19,15 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
       - name: Check what is missing
         id: need
         run: |
           echo "lock=$([ -f pnpm-lock.yaml ] && echo false || echo true)" >> "$GITHUB_OUTPUT"
-          echo "gaz=$([ -f pipeline/data/boundaries.json ] && echo false || echo true)" >> "$GITHUB_OUTPUT"
-      - uses: pnpm/action-setup@v6
-        if: steps.need.outputs.lock == 'true' || steps.need.outputs.gaz == 'true'
-      - uses: actions/setup-node@v7
-        if: steps.need.outputs.lock == 'true' || steps.need.outputs.gaz == 'true'
-        with:
-          node-version-file: .nvmrc
+          echo "gaz=$(node pipeline/scripts/boundaries-current.ts >/dev/null && echo false || echo true)" >> "$GITHUB_OUTPUT"
       - name: Install and format
         if: steps.need.outputs.lock == 'true'
         run: |
@@ -39,7 +37,7 @@ jobs:
         if: steps.need.outputs.gaz == 'true'
         run: |
           pnpm install --frozen-lockfile --filter @ceqa-atlas/pipeline...
-          pnpm --filter @ceqa-atlas/pipeline boundaries
+          NODE_OPTIONS=--max-old-space-size=8192 pnpm --filter @ceqa-atlas/pipeline boundaries
       - name: Commit
         if: steps.need.outputs.lock == 'true' || steps.need.outputs.gaz == 'true'
         run: |
@@ -47,4 +45,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git diff --cached --quiet || git commit -m "Bootstrap: lockfile, Census place reference, formatting"
+          git pull --rebase --quiet
           git push
