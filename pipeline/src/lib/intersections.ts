@@ -298,7 +298,8 @@ export function placeAlongStreet(
       s = Math.min(s, y);
       n = Math.max(n, y);
     }
-  if (haversineKm({ lon: w, lat: s }, { lon: e, lat: n }) > MAX_STREET_SPREAD_KM) return { ok: false, reason: 'too-long' };
+  if (haversineKm({ lon: w, lat: s }, { lon: e, lat: n }) > MAX_STREET_SPREAD_KM)
+    return { ok: false, reason: 'too-long' };
   const total = segs.reduce((t, g) => t + g.km, 0);
   let pick = seededRandom(`${seed}:street`)() * total;
   for (const g of segs) {
