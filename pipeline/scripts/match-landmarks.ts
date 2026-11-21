@@ -9,13 +9,15 @@ import { readFile } from 'node:fs/promises';
 import { groupBySch } from '../src/lib/aggregate.ts';
 import type { Boundaries } from '../src/lib/boundaries.ts';
 import type { CeqaDocument } from '../src/lib/document.ts';
-import { type Gazetteer, landmarkFor, placeNameTest } from '../src/lib/landmarks.ts';
+import { type Gazetteer, landmarkFor, landmarkTexts, nameMentions, placeNameTest } from '../src/lib/landmarks.ts';
 import { haversineKm, resolveLocation } from '../src/lib/location.ts';
 import { listPartitionMonths, readPartition } from '../src/lib/partitions.ts';
 import { seededRandom } from '../src/lib/random.ts';
 import { storageFromEnv } from '../src/lib/storage.ts';
 
 const SAMPLE = Number(process.env.SAMPLE ?? 80);
+/** Projects to explain in detail (mentions found and their GNIS entries). */
+const EXPLAIN = new Set((process.env.EXPLAIN ?? '2026110686').split(','));
 const storage = storageFromEnv();
 const boundaries = JSON.parse(
   await readFile(new URL('../data/boundaries.json', import.meta.url), 'utf8'),
@@ -39,6 +41,17 @@ for (const [sch, list] of groupBySch(docs)) {
   inc(`approximate:${loc.precision}`);
   const r = landmarkFor(newestFirst, boundaries, gnis, isPlaceName);
   inc(`outcome:${r.kind}`);
+  if (EXPLAIN.has(sch)) {
+    const texts = landmarkTexts(newestFirst);
+    console.log(JSON.stringify({ explain: sch, outcome: r, texts }));
+    for (const m of nameMentions(texts)) {
+      const hits = gnis.names[m.key];
+      if (hits || isPlaceName(m.key))
+        console.log(JSON.stringify({ mention: m.text, isPlaceName: isPlaceName(m.key), hits }));
+    }
+    const shelter = Object.entries(gnis.names).filter(([k]) => /shelter island|la playa/.test(k));
+    console.log(JSON.stringify({ gnisLike: shelter }));
+  }
   if (r.kind !== 'placed') continue;
   inc(`placed:from:${loc.precision}`);
   inc(`placed:class:${r.placement.featureClass}`);
