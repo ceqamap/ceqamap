@@ -37,12 +37,12 @@ export function HoverCard({ info, mode }: { info: HoverInfo | null; mode: 'light
       <p className="hover-title">{info.props.t}</p>
       <p className="hover-meta">
         <span
-          className={`dot ${info.props.x ? '' : 'ring-only'}`}
-          style={{ background: status[mode], borderColor: status[mode] }}
+          className={`dot ${info.props.x === 0 ? 'ring-only' : info.props.x === 2 ? 'cross' : ''}`}
+          style={{ backgroundColor: status[mode], borderColor: status[mode] }}
           aria-hidden="true"
         />
         {status.label}
-        {info.props.x ? '' : ' · approximate location'}
+        {info.props.x === 0 ? ' · approximate location' : info.props.x === 2 ? ' · near the listed cross streets' : ''}
       </p>
     </div>
   );

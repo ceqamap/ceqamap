@@ -7,7 +7,8 @@ import { LABEL_FONT } from './basemaps.ts';
  *
  * Encoding (see docs/DESIGN.md):
  *   color       CEQA stage (validated categorical palette, light and dark sets)
- *   fill        solid = coordinates from the agency; hollow ring = approximate
+ *   fill        solid = coordinates from the agency; solid with a lighter center =
+ *               near the listed cross streets; hollow ring = approximate
  *   clusters    hairline circles sized by count, echoing the reference site's
  *               node graph; a green ring means at least one project inside is
  *               in public review right now
@@ -20,9 +21,11 @@ export const LAYER = {
   clusterCount: 'projects-cluster-count',
   approx: 'projects-approx',
   exact: 'projects-exact',
+  crossStreets: 'projects-cross-streets',
+  crossStreetsCenter: 'projects-cross-streets-center',
   pulse: 'projects-pulse',
 } as const;
-export const INTERACTIVE_LAYERS = [LAYER.clusters, LAYER.exact, LAYER.approx];
+export const INTERACTIVE_LAYERS = [LAYER.clusters, LAYER.exact, LAYER.crossStreets, LAYER.approx];
 
 export interface LayerTheme {
   mode: 'light' | 'dark';
@@ -46,18 +49,23 @@ const notCluster: ExpressionSpecification = ['!', ['has', 'point_count']];
 const hovered: ExpressionSpecification = ['boolean', ['feature-state', 'hover'], false];
 const selected: ExpressionSpecification = ['boolean', ['feature-state', 'selected'], false];
 
-/** Point radius grows gently with zoom; hover and selection enlarge it. */
-function pointRadius(base: number): ExpressionSpecification {
+/**
+ * Point radius grows gently with zoom; hover and selection enlarge it.
+ * `scale` shrinks the whole curve (for the lighter center of cross-street dots;
+ * zoom curves can't be multiplied after the fact).
+ */
+function pointRadius(base: number, scale = 1): ExpressionSpecification {
+  const r = (v: number) => v * scale;
   return [
     'interpolate',
     ['linear'],
     ['zoom'],
     4,
-    ['case', selected, base + 4, hovered, base + 2, base * 0.6],
+    ['case', selected, r(base + 4), hovered, r(base + 2), r(base * 0.6)],
     10,
-    ['case', selected, base + 5, hovered, base + 3, base],
+    ['case', selected, r(base + 5), hovered, r(base + 3), r(base)],
     15,
-    ['case', selected, base + 7, hovered, base + 4, base * 1.8],
+    ['case', selected, r(base + 7), hovered, r(base + 4), r(base * 1.8)],
   ] as ExpressionSpecification;
 }
 
@@ -136,6 +144,35 @@ export function projectLayers({ mode }: LayerTheme): LayerSpecification[] {
       },
     },
     {
+      // Near the listed cross streets: a solid dot in the status color…
+      id: LAYER.crossStreets,
+      type: 'circle',
+      source: SOURCE_ID,
+      'source-layer': SOURCE_LAYER,
+      filter: ['all', notCluster, ['==', ['get', 'x'], 2]],
+      layout: { 'circle-sort-key': sortKey },
+      paint: {
+        'circle-radius': pointRadius(4),
+        'circle-color': color,
+        'circle-stroke-color': ['case', selected, ink, surface],
+        'circle-stroke-width': ['case', selected, 2.5, 1.5],
+      },
+    },
+    {
+      // …with a lighter center, so it reads as "close, not exact".
+      id: LAYER.crossStreetsCenter,
+      type: 'circle',
+      source: SOURCE_ID,
+      'source-layer': SOURCE_LAYER,
+      filter: ['all', notCluster, ['==', ['get', 'x'], 2]],
+      layout: { 'circle-sort-key': sortKey },
+      paint: {
+        'circle-radius': pointRadius(4, 0.45),
+        'circle-color': '#ffffff',
+        'circle-opacity': 0.62,
+      },
+    },
+    {
       // A soft halo that breathes around in-review projects (animated in MapView).
       id: LAYER.pulse,
       type: 'circle',
@@ -161,7 +198,15 @@ export function ensureProjectLayers(map: MapLibreMap, tilesUrl: string, theme: L
     if (map.getLayer(layer.id)) map.removeLayer(layer.id);
   }
   // Pulse sits beneath the dots; clusters on top of everything.
-  const order = [LAYER.pulse, LAYER.approx, LAYER.exact, LAYER.clusters, LAYER.clusterCount];
+  const order = [
+    LAYER.pulse,
+    LAYER.approx,
+    LAYER.crossStreets,
+    LAYER.crossStreetsCenter,
+    LAYER.exact,
+    LAYER.clusters,
+    LAYER.clusterCount,
+  ];
   const byId = Object.fromEntries(projectLayers(theme).map((l) => [l.id, l]));
   for (const id of order) map.addLayer(byId[id]);
 }

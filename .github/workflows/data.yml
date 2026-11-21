@@ -105,8 +105,18 @@ jobs:
           make -C /tmp/tippecanoe -j"$(nproc)"
           mkdir -p ~/.local/bin && cp /tmp/tippecanoe/tippecanoe ~/.local/bin/
 
+      - name: Restore Census road files
+        if: steps.decide.outputs.build == 'true'
+        uses: actions/cache@v6
+        with:
+          path: .tiger
+          key: tiger-roads-2024-ca
+
       - name: Build data
         if: steps.decide.outputs.build == 'true'
+        env:
+          TIGER_DIR: ${{ github.workspace }}/.tiger
+          NODE_OPTIONS: --max-old-space-size=6144
         run: |
           export TIPPECANOE="$HOME/.local/bin/tippecanoe"
           pnpm --filter @ceqa-atlas/pipeline build-data

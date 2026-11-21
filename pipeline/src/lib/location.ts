@@ -15,9 +15,10 @@ import { seededRandom } from './random.ts';
  *      Agencies make typos (36° for 39° puts Ukiah in the Pacific; 122.565
  *      for 122.315 puts downtown San Mateo 22 km offshore but still "in" the
  *      county); a point that contradicts the project's own places is wrong.
- *   2. A random spot inside the listed city (or 2–3 nearby cities).
- *   3. A random spot inside the listed county (or 2–3 nearby counties).
- *   4. Nothing: statewide and multi-region projects are not mapped.
+ *   2. Where the listed cross streets meet (see crossStreets.ts), if found.
+ *   3. A random spot inside the listed city (or 2–3 nearby cities).
+ *   4. A random spot inside the listed county (or 2–3 nearby counties).
+ *   5. Nothing: statewide and multi-region projects are not mapped.
  *
  * "Random" is seeded by the SCH number, so a project lands in the same spot
  * on every rebuild, and spots are drawn inside the real Census outline, which
@@ -33,6 +34,12 @@ export interface ResolvedLocation {
   precision: LocationPrecision;
   /** True when the agency's coordinates were discarded as inconsistent. */
   coordinatesRejected: boolean;
+  /** For `intersection`: the streets used. */
+  streets?: [string, string];
+}
+
+export interface LocationHints {
+  crossStreets?: { lon: number; lat: number; streets: [string, string] };
 }
 
 /** Coastal, harbor, and border projects can sit just outside the county line. */
@@ -126,6 +133,7 @@ export function resolveLocation(
   sch: string,
   docsNewestFirst: readonly CeqaDocument[],
   b: Boundaries,
+  hints: LocationHints = {},
 ): ResolvedLocation | null {
   const placeDoc = docsNewestFirst.find((d) => d.cities.length > 0 || d.counties.length > 0);
   const cities = (placeDoc?.cities ?? []).filter((c) => !/unincorporated|various|statewide|countywide/i.test(c));
@@ -144,6 +152,11 @@ export function resolveLocation(
         : nearAny(p.lon, p.lat, Object.values(b.counties), STATE_TOLERANCE_KM);
     if (plausible) return { ...p, precision: 'exact', coordinatesRejected: false };
     coordinatesRejected = true;
+  }
+
+  if (hints.crossStreets) {
+    const { lon, lat, streets } = hints.crossStreets;
+    return { lon, lat, precision: 'intersection', coordinatesRejected, streets };
   }
 
   if (!placeDoc) return null;

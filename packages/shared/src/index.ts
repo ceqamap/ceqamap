@@ -97,13 +97,23 @@ export const STATUS_BY_ID: Readonly<Record<ProjectStatus, StatusDefinition>> = O
  * How we know where a project is. Only `exact` comes from coordinates the
  * lead agency entered; everything else is a best-effort placement.
  */
-export type LocationPrecision = 'exact' | 'city' | 'county' | 'region';
+export type LocationPrecision = 'exact' | 'intersection' | 'city' | 'county' | 'region';
 
 export const PRECISION_LABEL: Readonly<Record<LocationPrecision, string>> = {
   exact: 'Coordinates provided by the lead agency',
+  intersection: 'Near the listed cross streets',
   city: 'Approximate: placed within the listed city',
   county: 'Approximate: placed within the listed county',
   region: 'Approximate: placed between the listed counties',
+};
+
+/** How each precision is drawn: 1 solid dot, 2 dot with a lighter center, 0 hollow ring. */
+export const PRECISION_MARK: Readonly<Record<LocationPrecision, 0 | 1 | 2>> = {
+  exact: 1,
+  intersection: 2,
+  city: 0,
+  county: 0,
+  region: 0,
 };
 
 // ---------------------------------------------------------------------------
@@ -186,6 +196,8 @@ export interface PublishedProject {
     zip: string | null;
     /** The agency's coordinates contradicted the listed county and were not used. */
     coordinatesRejected: boolean;
+    /** For `intersection`: the two listed streets whose meeting point was used. */
+    streets?: [string, string];
   } | null;
   facts: {
     totalAcres: number | null;
@@ -234,8 +246,8 @@ export interface TilePointProperties {
   t: string;
   /** Status id. */
   s: ProjectStatus;
-  /** Precision: 1 = exact, 0 = approximate. */
-  x: 0 | 1;
+  /** Mark: 1 = exact, 2 = near the listed cross streets, 0 = approximate (see PRECISION_MARK). */
+  x: 0 | 1 | 2;
   /** 1 if in review (summed by clustering). */
   r: 0 | 1;
 }

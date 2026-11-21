@@ -395,6 +395,10 @@ a {
 .dot.solid {
   background: var(--ink-2);
 }
+.dot.cross {
+  background-color: var(--ink-2);
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.62) 0 32%, transparent 36%);
+}
 .dot.ring {
   background: transparent;
   border: 1.5px solid var(--ink-2);

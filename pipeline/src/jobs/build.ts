@@ -12,11 +12,14 @@ import { spawnSync } from 'node:child_process';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { PublishedMeta } from '../../../packages/shared/src/index.ts';
-import { aggregate } from '../lib/aggregate.ts';
+import { aggregate, groupBySch } from '../lib/aggregate.ts';
 import { todayInCalifornia } from '../lib/ceqanet.ts';
 import type { CeqaDocument } from '../lib/document.ts';
 import type { Boundaries } from '../lib/boundaries.ts';
+import { crossStreetRequest, placeAtCrossStreets, type CrossStreetRequest } from '../lib/crossStreets.ts';
+import { resolveLocation } from '../lib/location.ts';
 import { log } from '../lib/log.ts';
+import { countyFips, countyRoads } from '../lib/tiger.ts';
 import { listPartitionMonths, readPartition } from '../lib/partitions.ts';
 import { storageFromEnv } from '../lib/storage.ts';
 
@@ -32,7 +35,23 @@ if (docs.length === 0) throw new Error('No documents in storage. Run backfill fi
 
 const builtAt = new Date().toISOString();
 const today = todayInCalifornia();
-const result = aggregate(docs, boundaries, today, builtAt);
+// Cross streets: for projects without usable agency coordinates, find where
+// their listed streets meet. Census road files are cached in $TIGER_DIR.
+const fips = countyFips(boundaries);
+const tigerDir = process.env.TIGER_DIR ?? new URL('../../.tiger/', import.meta.url).pathname;
+const requests: CrossStreetRequest[] = [];
+for (const [sch, list] of groupBySch(docs)) {
+  const newestFirst = [...list].sort((a, b) => (a.received < b.received ? 1 : a.received > b.received ? -1 : 0));
+  if (resolveLocation(sch, newestFirst, boundaries)?.precision === 'exact') continue;
+  const req = crossStreetRequest(sch, newestFirst, boundaries, (k) => fips.has(k));
+  if (req) requests.push(req);
+}
+const { placements, stats: crossStreetStats } =
+  process.env.SKIP_CROSS_STREETS === '1'
+    ? { placements: new Map(), stats: { requests: 0, outcomes: {} } }
+    : await placeAtCrossStreets(requests, boundaries, (county) => countyRoads(tigerDir, fips.get(county)!));
+
+const result = aggregate(docs, boundaries, today, builtAt, placements);
 
 await rm(OUT, { recursive: true, force: true });
 await mkdir(join(OUT, 'projects'), { recursive: true });
@@ -52,7 +71,7 @@ const meta: PublishedMeta = {
   counts: result.counts,
 };
 await writeFile(join(OUT, 'meta.json'), JSON.stringify(meta, null, 2));
-log.info('Aggregated', { ...result.counts, today });
+log.info('Aggregated', { ...result.counts, today, crossStreets: crossStreetStats });
 
 // Tippecanoe: cluster overlapping points below z13, keep every point (no
 // dropping) so the map is a complete census, and sum `r` so clusters know how

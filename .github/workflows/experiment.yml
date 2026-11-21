@@ -4,11 +4,6 @@ name: Data experiment
 # reports (e.g. intersection matching). Results go to the log and to state/;
 # nothing public changes.
 on:
-  # Also runs on pushes to experiment branches, since a manual trigger only
-  # becomes available once this file is on main.
-  push:
-    branches: [intersections]
-    paths: [pipeline/**, .github/workflows/experiment.yml]
   workflow_dispatch:
     inputs:
       script:
