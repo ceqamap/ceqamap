@@ -129,28 +129,51 @@ function placeWithin(areas: Area[], rand: () => number): { lon: number; lat: num
   return samplePointInShape(target.shape, target.bbox, rand);
 }
 
+export interface ListedPlaces {
+  placeDoc: CeqaDocument | undefined;
+  cities: string[];
+  counties: string[];
+  cityAreas: Area[] | null;
+  countyAreas: Area[] | null;
+}
+
+/** The cities and counties a project lists (newest document that lists any). */
+export function listedPlaces(docsNewestFirst: readonly CeqaDocument[], b: Boundaries): ListedPlaces {
+  const placeDoc = docsNewestFirst.find((d) => d.cities.length > 0 || d.counties.length > 0);
+  const cities = (placeDoc?.cities ?? []).filter((c) => !/unincorporated|various|statewide|countywide/i.test(c));
+  const counties = (placeDoc?.counties ?? []).filter((c) => !/various|statewide/i.test(c));
+  const countyAreas = counties.length > 0 && counties.length <= 10 ? lookup(counties, b.counties) : null;
+  const cityAreas = cities.length > 0 && cities.length <= MAX_LISTED_CITIES ? lookup(cities, b.places) : null;
+  return { placeDoc, cities, counties, cityAreas, countyAreas };
+}
+
+/**
+ * Does a point agree with the places the project lists? Within 10 km of a
+ * listed city, else within 5 km of a listed county, else within 25 km of
+ * California.
+ */
+export function agreesWithPlaces(p: { lon: number; lat: number }, places: ListedPlaces, b: Boundaries): boolean {
+  return places.cityAreas
+    ? nearAny(p.lon, p.lat, places.cityAreas, CITY_TOLERANCE_KM)
+    : places.countyAreas
+      ? nearAny(p.lon, p.lat, places.countyAreas, COORDINATE_TOLERANCE_KM)
+      : nearAny(p.lon, p.lat, Object.values(b.counties), STATE_TOLERANCE_KM);
+}
+
 export function resolveLocation(
   sch: string,
   docsNewestFirst: readonly CeqaDocument[],
   b: Boundaries,
   hints: LocationHints = {},
 ): ResolvedLocation | null {
-  const placeDoc = docsNewestFirst.find((d) => d.cities.length > 0 || d.counties.length > 0);
-  const cities = (placeDoc?.cities ?? []).filter((c) => !/unincorporated|various|statewide|countywide/i.test(c));
-  const counties = (placeDoc?.counties ?? []).filter((c) => !/various|statewide/i.test(c));
-  const countyAreas = counties.length > 0 && counties.length <= 10 ? lookup(counties, b.counties) : null;
-  const cityAreas = cities.length > 0 && cities.length <= MAX_LISTED_CITIES ? lookup(cities, b.places) : null;
+  const places = listedPlaces(docsNewestFirst, b);
+  const { placeDoc, counties, cityAreas, countyAreas } = places;
 
   let coordinatesRejected = false;
   for (const d of docsNewestFirst) {
     const p = parseCoordinates(d.coordinates);
     if (!p) continue;
-    const plausible = cityAreas
-      ? nearAny(p.lon, p.lat, cityAreas, CITY_TOLERANCE_KM)
-      : countyAreas
-        ? nearAny(p.lon, p.lat, countyAreas, COORDINATE_TOLERANCE_KM)
-        : nearAny(p.lon, p.lat, Object.values(b.counties), STATE_TOLERANCE_KM);
-    if (plausible) return { ...p, precision: 'exact', coordinatesRejected: false };
+    if (agreesWithPlaces(p, places, b)) return { ...p, precision: 'exact', coordinatesRejected: false };
     coordinatesRejected = true;
   }
 

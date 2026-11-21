@@ -9,7 +9,7 @@ on:
       script:
         description: 'Script in pipeline/scripts to run'
         type: choice
-        options: [match-intersections]
+        options: [match-intersections, profile-locations]
         default: match-intersections
 
 concurrency:
