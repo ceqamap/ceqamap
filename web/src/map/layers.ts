@@ -81,13 +81,19 @@ function clusterRadiusExpr(stages: readonly ProjectStatus[]): ExpressionSpecific
  * 10 px. Follows the dots' zoom curve and selection size (see pointRadius) so
  * the ring is never hidden under its own dot.
  */
-export function arrivalRadius(stages: readonly ProjectStatus[], progress: number): ExpressionSpecification {
+export function arrivalRadius(
+  stages: readonly ProjectStatus[],
+  progress: number,
+  selectedId: string | null = null,
+): ExpressionSpecification {
   const grow = progress * 10;
   const at = (dot: number, selectedDot: number) => [
     'case',
     ['has', 'point_count'],
     ['+', clusterRadiusExpr(stages), 1 + grow],
-    ['boolean', ['feature-state', 'selected'], false],
+    // By id rather than feature-state, which this layer did not pick up
+    // reliably while its radius is re-set every frame (2026-11-21).
+    ['==', ['to-string', ['get', 'id']], selectedId ?? ''],
     selectedDot + 2 + grow,
     dot + 2 + grow,
   ];
