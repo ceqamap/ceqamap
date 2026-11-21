@@ -7,11 +7,10 @@
  */
 import { readFile } from 'node:fs/promises';
 import { groupBySch } from '../src/lib/aggregate.ts';
-import { type Boundaries, normalizePlaceName } from '../src/lib/boundaries.ts';
+import type { Boundaries } from '../src/lib/boundaries.ts';
 import type { CeqaDocument } from '../src/lib/document.ts';
-import { distanceToShapeKm } from '../src/lib/geometry.ts';
-import { findLandmark, type Gazetteer } from '../src/lib/landmarks.ts';
-import { haversineKm, listedPlaces, resolveLocation } from '../src/lib/location.ts';
+import { type Gazetteer, landmarkFor, placeNameTest } from '../src/lib/landmarks.ts';
+import { haversineKm, resolveLocation } from '../src/lib/location.ts';
 import { listPartitionMonths, readPartition } from '../src/lib/partitions.ts';
 import { seededRandom } from '../src/lib/random.ts';
 import { storageFromEnv } from '../src/lib/storage.ts';
@@ -22,9 +21,7 @@ const boundaries = JSON.parse(
   await readFile(new URL('../data/boundaries.json', import.meta.url), 'utf8'),
 ) as Boundaries;
 const gnis = JSON.parse(await readFile(new URL('../data/gnis.json', import.meta.url), 'utf8')) as Gazetteer;
-const placeNames = new Set([...Object.keys(boundaries.places), ...Object.keys(boundaries.counties)]);
-const isPlaceName = (k: string) =>
-  placeNames.has(k) || placeNames.has(k.replace(/ county$/, '')) || /^(city|county|state) of /.test(k);
+const isPlaceName = placeNameTest(boundaries);
 
 const docs: CeqaDocument[] = [];
 for (const m of await listPartitionMonths(storage)) docs.push(...(await readPartition(storage, m)));
@@ -40,28 +37,7 @@ for (const [sch, list] of groupBySch(docs)) {
   const loc = resolveLocation(sch, newestFirst, boundaries);
   if (!loc || loc.precision === 'exact') continue;
   inc(`approximate:${loc.precision}`);
-  const places = listedPlaces(newestFirst, boundaries);
-  const counties = (places.counties ?? []).map(normalizePlaceName);
-  const cityAreas = places.cityAreas;
-  const texts = [
-    ...new Set(
-      [
-        newestFirst[0].projectTitle,
-        newestFirst[0].documentTitle,
-        newestFirst[0].description,
-        newestFirst[0].crossStreets,
-      ]
-        .map((t) => t?.trim())
-        .filter((t): t is string => !!t),
-    ),
-  ];
-  const r = findLandmark(texts, gnis, {
-    counties,
-    isPlaceName,
-    distanceToCityKm: cityAreas
-      ? (p) => Math.min(...cityAreas.map((a) => distanceToShapeKm(p.lon, p.lat, a.shape)))
-      : undefined,
-  });
+  const r = landmarkFor(newestFirst, boundaries, gnis, isPlaceName);
   inc(`outcome:${r.kind}`);
   if (r.kind !== 'placed') continue;
   inc(`placed:from:${loc.precision}`);

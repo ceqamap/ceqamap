@@ -1,5 +1,7 @@
-import { normalizePlaceName } from './boundaries.ts';
-import { haversineKm } from './location.ts';
+import { type Boundaries, normalizePlaceName } from './boundaries.ts';
+import type { CeqaDocument } from './document.ts';
+import { distanceToShapeKm } from './geometry.ts';
+import { haversineKm, listedPlaces } from './location.ts';
 
 /**
  * Named places in a project's own words: "dredging at Southwestern Yacht Club
@@ -21,6 +23,16 @@ import { haversineKm } from './location.ts';
  *   - Same name, several places in the county (more than 3 km apart): skipped.
  *   - Several different named places more than 15 km apart (a pipeline from
  *     one to the other, a countywide program): skipped.
+ *   - A name followed by a street type or an organization word is a street or
+ *     an agency, not the place: "San Pedro Street", "El Toro Road", "San
+ *     Joaquin Hills Transportation Corridor Agency".
+ *
+ * Measured on all approximately placed projects (2026-11-21): about 14,000 of
+ * 286,000 name a place GNIS can locate; a hand check of 70 looked right in
+ * roughly 8 of 10, and most misses were the street and agency names above.
+ * Since GNIS dropped buildings, schools, parks and dams in 2022, what's left
+ * is natural features (islands, beaches, points, summits, springs, passes),
+ * military sites, and communities.
  */
 
 export interface Gazetteer {
@@ -86,6 +98,46 @@ export const CLASS_RANK: Readonly<Record<string, 1 | 2 | 3>> = {
 
 const CONNECTORS = new Set(['de', 'del', 'la', 'las', 'los', 'el', 'of', 'the', 'and', 'y', 'at', 'on', 'by', 'du']);
 const MAX_WORDS = 6;
+/** A name followed by one of these is a street or an organization, not a place. */
+const NOT_A_PLACE_AFTER = new Set([
+  'street',
+  'st',
+  'road',
+  'rd',
+  'avenue',
+  'ave',
+  'boulevard',
+  'blvd',
+  'drive',
+  'dr',
+  'way',
+  'lane',
+  'ln',
+  'parkway',
+  'pkwy',
+  'highway',
+  'hwy',
+  'court',
+  'ct',
+  'place',
+  'pl',
+  'circle',
+  'terrace',
+  'trail',
+  'expressway',
+  'freeway',
+  'agency',
+  'authority',
+  'district',
+  'unified',
+  'corridor',
+  'commission',
+  'council',
+  'conservancy',
+  'corporation',
+  'inc',
+  'llc',
+]);
 /** Same-name features farther apart than this are different places. */
 const SAME_NAME_SPREAD_KM = 3;
 /** Different named places farther apart than this mean a multi-site project. */
@@ -161,6 +213,7 @@ export function nameMentions(texts: readonly string[]): NameMention[] {
           const w = words[j];
           if (!isCapitalized(w) && !CONNECTORS.has(w.toLowerCase())) break;
           if (!isCapitalized(w)) continue; // a name can't end on a connector
+          if (NOT_A_PLACE_AFTER.has(words[j + 1]?.toLowerCase() ?? '')) continue;
           const raw = words.slice(i, j + 1).join(' ');
           const key = normalizeName(raw);
           if (seen.has(key)) continue;
@@ -255,4 +308,36 @@ function spreadKm(points: readonly { lon: number; lat: number }[]): number {
   for (let i = 0; i < points.length; i++)
     for (let j = i + 1; j < points.length; j++) m = Math.max(m, haversineKm(points[i], points[j]));
   return m;
+}
+
+/** Names of California cities and counties, which are never landmarks. */
+export function placeNameTest(b: Boundaries): (key: string) => boolean {
+  const names = new Set([...Object.keys(b.places), ...Object.keys(b.counties)]);
+  return (k) => names.has(k) || names.has(k.replace(/ county$/, '')) || /^(city|county|state) of /.test(k);
+}
+
+/** The texts a project names places in: newest titles, description and cross streets. */
+export function landmarkTexts(docsNewestFirst: readonly CeqaDocument[]): string[] {
+  const d = docsNewestFirst[0];
+  if (!d) return [];
+  const texts = [d.projectTitle, d.documentTitle, d.description, d.crossStreets].map((t) => t?.trim());
+  return [...new Set(texts.filter((t): t is string => !!t))];
+}
+
+/** Find the named place for one project, checked against the places it lists. */
+export function landmarkFor(
+  docsNewestFirst: readonly CeqaDocument[],
+  b: Boundaries,
+  g: Gazetteer,
+  isPlaceName: (key: string) => boolean,
+): LandmarkOutcome {
+  const places = listedPlaces(docsNewestFirst, b);
+  const cityAreas = places.cityAreas;
+  return findLandmark(landmarkTexts(docsNewestFirst), g, {
+    counties: places.counties.map(normalizePlaceName),
+    isPlaceName,
+    distanceToCityKm: cityAreas
+      ? (p) => Math.min(...cityAreas.map((a) => distanceToShapeKm(p.lon, p.lat, a.shape)))
+      : undefined,
+  });
 }

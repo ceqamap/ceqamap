@@ -9,6 +9,7 @@
  * must run at least daily even when no new documents arrived.
  */
 import { spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
@@ -28,7 +29,8 @@ import type { Boundaries } from '../lib/boundaries.ts';
 import { addressRequest, placeAtAddresses, type AddressRequest } from '../lib/addresses.ts';
 import { loadGeocodeCache, saveGeocodeCache } from '../lib/geocode.ts';
 import { crossStreetRequest, placeAtCrossStreets, type CrossStreetRequest } from '../lib/crossStreets.ts';
-import { type AddressPlacement, resolveLocation } from '../lib/location.ts';
+import { type Gazetteer, landmarkFor, placeNameTest } from '../lib/landmarks.ts';
+import { type AddressPlacement, type LocationHints, resolveLocation } from '../lib/location.ts';
 import { log } from '../lib/log.ts';
 import { countyFips, countyRoads } from '../lib/tiger.ts';
 import { listPartitionMonths, readPartition } from '../lib/partitions.ts';
@@ -40,6 +42,12 @@ const storage = storageFromEnv();
 
 const boundariesPath = process.env.BOUNDARIES_PATH ?? new URL('../../data/boundaries.json', import.meta.url).pathname;
 const boundaries = JSON.parse(await readFile(boundariesPath, 'utf8')) as Boundaries;
+// Named places (USGS GNIS), fetched by scripts/fetch-gnis.ts. Optional: without
+// the file, projects that name a place fall back to the next-best placement.
+const gnisPath = process.env.GNIS_PATH ?? new URL('../../data/gnis.json', import.meta.url).pathname;
+const gnis = existsSync(gnisPath) ? (JSON.parse(await readFile(gnisPath, 'utf8')) as Gazetteer) : null;
+if (!gnis) log.warn('No gnis.json; skipping named-place placement', { gnisPath });
+const isPlaceName = placeNameTest(boundaries);
 
 const docs: CeqaDocument[] = [];
 for (const month of await listPartitionMonths(storage)) docs.push(...(await readPartition(storage, month)));
@@ -53,9 +61,16 @@ const fips = countyFips(boundaries);
 const tigerDir = process.env.TIGER_DIR ?? new URL('../../.tiger/', import.meta.url).pathname;
 const requests: CrossStreetRequest[] = [];
 const addressRequests: AddressRequest[] = [];
+const landmarks = new Map<string, NonNullable<LocationHints['landmark']>>();
+const landmarkStats: Record<string, number> = {};
 for (const [sch, list] of groupBySch(docs)) {
   const newestFirst = [...list].sort((a, b) => (a.received < b.received ? 1 : a.received > b.received ? -1 : 0));
   if (resolveLocation(sch, newestFirst, boundaries)?.precision === 'exact') continue;
+  if (gnis) {
+    const r = landmarkFor(newestFirst, boundaries, gnis, isPlaceName);
+    landmarkStats[r.kind] = (landmarkStats[r.kind] ?? 0) + 1;
+    if (r.kind === 'placed') landmarks.set(sch, r.placement);
+  }
   const req = crossStreetRequest(sch, newestFirst, boundaries, (k) => fips.has(k));
   if (req) requests.push(req);
   const addr = addressRequest(sch, newestFirst, boundaries);
@@ -85,6 +100,7 @@ const { placements, stats: crossStreetStats } =
 const result = aggregate(docs, boundaries, today, builtAt, {
   crossStreets: placements,
   addresses: addressPlacements,
+  landmarks,
 });
 
 // Arrivals: flag projects with documents first seen in the latest batch.
@@ -130,6 +146,7 @@ log.info('Aggregated', {
   today,
   crossStreets: crossStreetStats,
   addresses: addressStats,
+  landmarks: landmarkStats,
   scopes: Object.fromEntries(TIME_SCOPES.map((s) => [s.id, scopes[s.id].counts.mapped])),
   arrivals: arrivals.published
     ? { at: arrivals.published.at, projects: arrivals.published.projects, filings: arrivals.published.filings }

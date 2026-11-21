@@ -64,8 +64,8 @@ export function scopeCounts(meta: PublishedMeta, scope: TimeScope) {
     byStatus: meta.counts.byStatus,
     byMark: {
       exact: p.exact + (p.address ?? 0),
-      intersection: p.intersection ?? 0,
-      approx: (p.street ?? 0) + (p.zip ?? 0) + p.city + p.county + p.region,
+      intersection: (p.intersection ?? 0) + (p.landmark ?? 0),
+      approx: (p.street ?? 0) + (p.community ?? 0) + (p.zip ?? 0) + p.city + p.county + p.region,
     },
     windowed: false,
   };

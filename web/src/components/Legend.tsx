@@ -79,7 +79,7 @@ export function Legend({ meta, mode, scope, stages, onStages }: Props) {
             </li>
             <li>
               <span className="dot cross" aria-hidden="true" />
-              <span className="legend-label">Near the listed cross streets</span>
+              <span className="legend-label">Near the listed cross streets or a named place</span>
               <span className="legend-count">{counts ? formatNumber(counts.byMark.intersection) : ''}</span>
             </li>
             <li>

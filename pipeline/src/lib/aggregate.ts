@@ -100,6 +100,7 @@ export function buildProject(
           coordinatesRejected: loc.coordinatesRejected,
           ...(loc.streets ? { streets: loc.streets } : {}),
           ...(loc.address ? { address: loc.address } : {}),
+          ...(loc.landmark ? { landmark: loc.landmark } : {}),
         }
       : null,
     facts: {
@@ -131,6 +132,7 @@ function round6(n: number): number {
 export interface Placements {
   crossStreets?: ReadonlyMap<string, CrossStreetPlacement>;
   addresses?: ReadonlyMap<string, AddressPlacement>;
+  landmarks?: ReadonlyMap<string, NonNullable<LocationHints['landmark']>>;
 }
 
 export function aggregate(
@@ -151,7 +153,9 @@ export function aggregate(
     exact: 0,
     address: 0,
     intersection: 0,
+    landmark: 0,
     street: 0,
+    community: 0,
     zip: 0,
     city: 0,
     county: 0,
@@ -167,6 +171,7 @@ export function aggregate(
     const p = buildProject(sch, list, boundaries, today, builtAt, {
       crossStreets: placements.crossStreets?.get(sch),
       address: placements.addresses?.get(sch),
+      landmark: placements.landmarks?.get(sch),
     });
     projects.push(p);
     byStatus[p.status]++;
