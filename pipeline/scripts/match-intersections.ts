@@ -103,34 +103,49 @@ for (const [sch, list] of groups) {
 console.log('Collected', JSON.stringify(stats), 'requests:', requests.length);
 
 // ---- 2. Match county by county --------------------------------------------
-async function countyRoads(fips: string) {
-  const name = `tl_${TIGER_VINTAGE}_06${fips}_roads`;
+/** Download (or reuse) one county's TIGER roads file; null if unavailable. */
+async function tryVintage(fips: string, vintage: string) {
+  const name = `tl_${vintage}_06${fips}_roads`;
   const dir = join(TIGER_DIR, name);
   if (!existsSync(join(dir, `${name}.shp`))) {
     await mkdir(dir, { recursive: true });
     const zip = join(dir, `${name}.zip`);
     // census.gov occasionally cuts a download short; verify the zip and retry.
-    for (let attempt = 1; ; attempt++) {
-      const res = await fetch(`https://www2.census.gov/geo/tiger/TIGER${TIGER_VINTAGE}/ROADS/${name}.zip`);
+    let ok = false;
+    for (let attempt = 1; attempt <= 3 && !ok; attempt++) {
+      const res = await fetch(`https://www2.census.gov/geo/tiger/TIGER${vintage}/ROADS/${name}.zip`);
+      if (res.status === 404) return null;
       if (res.ok) {
         await writeFile(zip, new Uint8Array(await res.arrayBuffer()));
         try {
           execFileSync('unzip', ['-t', '-q', zip], { stdio: 'pipe' });
-          break;
+          ok = true;
         } catch {
-          // fall through to retry
+          console.log(`Bad zip for ${name} (attempt ${attempt})`);
+          await new Promise((r) => setTimeout(r, attempt * 5000));
         }
       }
-      if (attempt >= 5) throw new Error(`Download failed for ${name} after ${attempt} attempts (last status ${res.status})`);
-      console.log(`Retrying ${name} (attempt ${attempt} failed)`);
-      await new Promise((r) => setTimeout(r, attempt * 5000));
     }
+    if (!ok) return null;
     execFileSync('unzip', ['-o', '-q', zip, '-d', dir]);
   }
   return readShapefile(
     new Uint8Array(await readFile(join(dir, `${name}.shp`))),
     new Uint8Array(await readFile(join(dir, `${name}.dbf`))),
   );
+}
+
+/** Prefer the 2024 roads; fall back to neighboring vintages if a file is broken. */
+async function countyRoads(fips: string) {
+  for (const vintage of [TIGER_VINTAGE, '2025', '2023']) {
+    const roads = await tryVintage(fips, vintage);
+    if (roads) {
+      if (vintage !== TIGER_VINTAGE) console.log(`Using ${vintage} roads for county ${fips}`);
+      return roads;
+    }
+  }
+  console.log(`WARNING: no usable roads file for county ${fips}; skipping it`);
+  return null;
 }
 
 const results = new Map<string, IntersectionResult>();
@@ -146,7 +161,9 @@ for (const [county, reqs] of byCounty) {
       const k = streetKeys(n);
       if (k) wanted.add(k.full).add(k.base);
     }
-  const index = buildRoadIndex(await countyRoads(fipsOf.get(county)!), wanted);
+  const roads = await countyRoads(fipsOf.get(county)!);
+  if (!roads) continue;
+  const index = buildRoadIndex(roads, wanted);
   for (const r of pending) {
     const res = findIntersection(index, r.names, { city: r.city, county: countyAreaOf(county) });
     const prior = results.get(r.sch);
