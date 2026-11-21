@@ -935,15 +935,48 @@ a {
   -webkit-backdrop-filter: blur(10px);
   box-shadow: var(--shadow-card);
   color: var(--ink-2);
-  transition: border-color 0.2s var(--ease);
 }
 .maplibregl-ctrl.maplibregl-ctrl-attrib.maplibregl-compact:hover {
   border-color: var(--ink);
 }
+.maplibregl-ctrl.maplibregl-ctrl-attrib.maplibregl-compact {
+  /* Open and close like the map key and layer menu: same duration and curve. */
+  interpolate-size: allow-keywords;
+  transition:
+    padding 320ms var(--ease),
+    border-color 0.2s var(--ease);
+}
 .maplibregl-ctrl.maplibregl-ctrl-attrib.maplibregl-compact-show {
-  /* Right: the 36px button plus the same 14px gap as the left edge, so the
-     credits never touch the button's hover circle. */
-  padding: 0 calc(36px + 14px) 0 14px;
+  /* Right: the 36px button plus an 8px gap, so the credits never touch the
+     button's hover circle. */
+  padding: 0 calc(36px + 8px) 0 14px;
+}
+/* The credits stay rendered so they can slide open: width 0 -> auto (browsers
+   without interpolate-size or ::details-content simply show them at once),
+   fading in after they start to open and out before they close. */
+.maplibregl-ctrl-attrib.maplibregl-compact::details-content {
+  content-visibility: visible;
+}
+.maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-inner {
+  display: block;
+  width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    width 320ms var(--ease),
+    opacity 160ms ease,
+    visibility 0s linear 320ms;
+}
+.maplibregl-ctrl-attrib.maplibregl-compact-show .maplibregl-ctrl-attrib-inner {
+  width: auto;
+  opacity: 1;
+  visibility: visible;
+  transition:
+    width 320ms var(--ease),
+    opacity 240ms ease 80ms,
+    visibility 0s;
 }
 .maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-button {
   top: 0;
@@ -951,9 +984,37 @@ a {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background-color: transparent;
-  background-position: center;
-  background-repeat: no-repeat; /* the 24px icon tiled at the edges of the larger button */
+  /* Our own icon (an ink disc with a white "i" drawn by ::before and ::after),
+     so the "i" can turn into an "x" while the credits are open. */
+  background: radial-gradient(circle, var(--ink) 0 9px, transparent 9.5px) center / 100% no-repeat;
+}
+.maplibregl-ctrl-attrib-button::before,
+.maplibregl-ctrl-attrib-button::after {
+  content: '';
+  position: absolute;
+  left: calc(50% - 1px);
+  width: 2px;
+  border-radius: 1px;
+  background: var(--card);
+  transition: transform 320ms var(--ease);
+}
+/* Stem of the "i"; one stroke of the "x". */
+.maplibregl-ctrl-attrib-button::before {
+  top: calc(50% - 3.5px);
+  height: 7px;
+  transform: translateY(1.5px);
+}
+/* Dot of the "i"; the other stroke of the "x". */
+.maplibregl-ctrl-attrib-button::after {
+  top: calc(50% - 1px);
+  height: 2px;
+  transform: translateY(-4px);
+}
+.maplibregl-compact-show .maplibregl-ctrl-attrib-button::before {
+  transform: rotate(45deg) scaleY(1.45);
+}
+.maplibregl-compact-show .maplibregl-ctrl-attrib-button::after {
+  transform: rotate(-45deg) scaleY(5);
 }
 /* MapLibre draws a blue glow on :focus, so it shows after every mouse click.
    Keep only the site's own focus ring, which browsers show for keyboard focus. */
