@@ -143,7 +143,10 @@ a {
   left: var(--gutter);
   z-index: 2;
   padding: 16px 20px 14px;
-  max-width: 360px;
+  /* Hug the longest line instead of a fixed width, so no empty band is left
+     on the right; still wraps if the window is narrower. */
+  width: max-content;
+  max-width: min(360px, calc(100vw - var(--gutter) * 2 - 64px));
 }
 
 .wordmark {
@@ -237,7 +240,7 @@ a {
 .scope-select select {
   appearance: none;
   margin: 0;
-  padding: 0 13px 0 0;
+  padding: 0 11px 0 0;
   border: 0;
   background: none;
   font: inherit;
@@ -1049,6 +1052,7 @@ a {
   }
   .header {
     right: calc(var(--gutter) * 2 + 40px);
+    width: auto;
     max-width: none;
     padding: 12px 14px 10px;
   }
