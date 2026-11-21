@@ -143,10 +143,9 @@ a {
   left: var(--gutter);
   z-index: 2;
   padding: 16px 20px 14px;
-  /* Hug the longest line instead of a fixed width, so no empty band is left
-     on the right; still wraps if the window is narrower. */
-  width: max-content;
-  max-width: min(360px, calc(100vw - var(--gutter) * 2 - 64px));
+  /* Same width as the map key below it; the subtitle's two lines fit it. */
+  width: var(--panel-width);
+  max-width: calc(100vw - var(--gutter) * 2 - 64px);
 }
 
 .wordmark {
@@ -433,7 +432,7 @@ a {
   left: var(--gutter);
   bottom: var(--gutter); /* level with the project drawer's bottom edge */
   z-index: 2;
-  width: 264px;
+  width: var(--panel-width);
   /* Same 2px inset as the zoom controls, so the header button lines up with them. */
   padding: 2px;
 }
