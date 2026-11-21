@@ -14,6 +14,7 @@ export interface ShapefileFeature {
 }
 
 const SHAPE_NULL = 0;
+const SHAPE_POLYLINE = 3;
 const SHAPE_POLYGON = 5;
 
 export function readShp(buf: Uint8Array): (Shape | null)[] {
@@ -28,7 +29,8 @@ export function readShp(buf: Uint8Array): (Shape | null)[] {
     const type = dv.getInt32(rec, true);
     if (type === SHAPE_NULL) {
       out.push(null);
-    } else if (type === SHAPE_POLYGON) {
+    } else if (type === SHAPE_POLYGON || type === SHAPE_POLYLINE) {
+      // Same layout: polylines' parts are lines instead of rings.
       const numParts = dv.getInt32(rec + 36, true);
       const numPoints = dv.getInt32(rec + 40, true);
       const partsAt = rec + 44;

@@ -37,6 +37,13 @@ export function Legend({ meta, mode }: { meta: PublishedMeta | null; mode: 'ligh
               <span className="legend-count">{meta ? formatNumber(meta.counts.byPrecision.exact) : ''}</span>
             </li>
             <li>
+              <span className="dot cross" aria-hidden="true" />
+              <span className="legend-label">Near the listed cross streets</span>
+              <span className="legend-count">
+                {meta ? formatNumber(meta.counts.byPrecision.intersection ?? 0) : ''}
+              </span>
+            </li>
+            <li>
               <span className="dot ring" aria-hidden="true" />
               <span className="legend-label">Approximate location</span>
               <span className="legend-count">{meta ? formatNumber(approx) : ''}</span>

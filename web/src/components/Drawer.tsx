@@ -135,7 +135,13 @@ function ProjectDetail({
       {(place || p.location) && (
         <p className="drawer-place">
           {place}
-          {p.location && <span className="muted"> · {PRECISION_LABEL[p.location.precision]}</span>}
+          {p.location && (
+            <span className="muted">
+              {' · '}
+              {PRECISION_LABEL[p.location.precision]}
+              {p.location.streets && ` (${p.location.streets[0]} and ${p.location.streets[1]})`}
+            </span>
+          )}
         </p>
       )}
       {p.location?.coordinatesRejected && (

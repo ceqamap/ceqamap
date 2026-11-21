@@ -1,0 +1,49 @@
+name: Data experiment
+
+# Runs a pipeline script against the real stored data, for prototypes and
+# reports (e.g. intersection matching). Results go to the log and to state/;
+# nothing public changes.
+on:
+  workflow_dispatch:
+    inputs:
+      script:
+        description: 'Script in pipeline/scripts to run'
+        type: choice
+        options: [match-intersections]
+        default: match-intersections
+
+concurrency:
+  group: experiment
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    if: vars.R2_BUCKET != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_BUCKET: ${{ vars.R2_BUCKET }}
+      TIGER_DIR: ${{ github.workspace }}/.tiger
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --filter @ceqa-atlas/pipeline...
+      - name: Restore Census road files
+        uses: actions/cache@v6
+        with:
+          path: .tiger
+          key: tiger-roads-2024-ca
+      - name: Ensure city and county boundaries
+        run: test -f pipeline/data/boundaries.json || pnpm --filter @ceqa-atlas/pipeline boundaries
+      - name: Run
+        run: node --max-old-space-size=6144 pipeline/scripts/${{ inputs.script || 'match-intersections' }}.ts

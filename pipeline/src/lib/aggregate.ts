@@ -1,5 +1,6 @@
 import {
   DOCUMENT_TYPES,
+  PRECISION_MARK,
   type LocationPrecision,
   type ProjectStatus,
   type PublishedMeta,
@@ -8,6 +9,7 @@ import {
 } from '../../../packages/shared/src/index.ts';
 import type { CeqaDocument } from './document.ts';
 import type { Boundaries } from './boundaries.ts';
+import type { CrossStreetPlacement } from './crossStreets.ts';
 import { resolveLocation } from './location.ts';
 import { deriveStatus } from './status.ts';
 
@@ -69,11 +71,12 @@ export function buildProject(
   boundaries: Boundaries,
   today: string,
   builtAt: string,
+  crossStreets?: CrossStreetPlacement,
 ): PublishedProject {
   const newestFirst = [...docs].sort((a, b) => (a.received < b.received ? 1 : a.received > b.received ? -1 : 0));
   const latest = newestFirst[0];
   const status = deriveStatus(docs, today);
-  const loc = resolveLocation(sch, newestFirst, boundaries);
+  const loc = resolveLocation(sch, newestFirst, boundaries, { crossStreets });
   const placeDoc = newestFirst.find((d) => d.cities.length || d.counties.length) ?? latest;
 
   return {
@@ -94,6 +97,7 @@ export function buildProject(
           crossStreets: firstNonEmpty(newestFirst.map((d) => d.crossStreets)) || null,
           zip: firstNonEmpty(newestFirst.map((d) => d.zip)) || null,
           coordinatesRejected: loc.coordinatesRejected,
+          ...(loc.streets ? { streets: loc.streets } : {}),
         }
       : null,
     facts: {
@@ -126,6 +130,7 @@ export function aggregate(
   boundaries: Boundaries,
   today: string,
   builtAt: string,
+  crossStreets: ReadonlyMap<string, CrossStreetPlacement> = new Map(),
 ): AggregateResult {
   const groups = groupBySch(docs);
   const projects: PublishedProject[] = [];
@@ -134,7 +139,10 @@ export function aggregate(
     ProjectStatus,
     number
   >;
-  const byPrecision = { exact: 0, city: 0, county: 0, region: 0 } satisfies Record<LocationPrecision, number>;
+  const byPrecision = { exact: 0, intersection: 0, city: 0, county: 0, region: 0 } satisfies Record<
+    LocationPrecision,
+    number
+  >;
   let documents = 0;
   let coordinatesRejected = 0;
   let latestReceived = '';
@@ -142,7 +150,7 @@ export function aggregate(
   for (const [sch, list] of groups) {
     documents += list.length;
     for (const d of list) if (d.received > latestReceived) latestReceived = d.received;
-    const p = buildProject(sch, list, boundaries, today, builtAt);
+    const p = buildProject(sch, list, boundaries, today, builtAt, crossStreets.get(sch));
     projects.push(p);
     byStatus[p.status]++;
     if (p.location) {
@@ -155,7 +163,7 @@ export function aggregate(
           id: sch,
           t: truncate(p.title, HOVER_TITLE_MAX),
           s: p.status,
-          x: p.location.precision === 'exact' ? 1 : 0,
+          x: PRECISION_MARK[p.location.precision],
           r: p.status === 'in_review' ? 1 : 0,
         },
       });

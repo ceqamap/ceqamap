@@ -37,13 +37,14 @@ Also observed: rapid back‑to‑back requests sometimes return an **empty** 200
 
 Each project gets the best location available, in this order:
 
-| Precision | Source                                                                 | On the map          |
-| --------- | ---------------------------------------------------------------------- | ------------------- |
-| Exact     | Coordinates typed by the lead agency, if consistent with listed county | Solid dot           |
-| City      | A seeded random spot inside the listed city (Census outline)           | Hollow ring         |
-| County    | A seeded random spot inside the listed county (Census outline)         | Hollow ring         |
-| Region    | Inside one of 2–3 neighboring listed counties                          | Hollow ring         |
-| None      | Statewide, or counties far apart                                       | Not mapped; counted |
+| Precision     | Source                                                                 | On the map          |
+| ------------- | ---------------------------------------------------------------------- | ------------------- |
+| Exact         | Coordinates typed by the lead agency, if consistent with listed county | Solid dot           |
+| Cross streets | Where the listed cross streets meet (Census road network)              | Dot, lighter center |
+| City          | A seeded random spot inside the listed city (Census outline)           | Hollow ring         |
+| County        | A seeded random spot inside the listed county (Census outline)         | Hollow ring         |
+| Region        | Inside one of 2–3 neighboring listed counties                          | Hollow ring         |
+| None          | Statewide, or counties far apart                                       | Not mapped; counted |
 
 Only about 11% of projects (38,000 of 335,000) have agency coordinates; nothing before roughly 2010 does.
 **Most points on the map are approximate**, and say so with a hollow ring and a line in the drawer.
@@ -61,9 +62,17 @@ How placement works, and why (lessons from the first full build, 2026‑11‑20)
   city or county, and the drawer explains why. Example: SCH 2024050310 near Ukiah was filed as 36°12′N instead of
   about 39°12′N, which is 330 km south and out to sea. `meta.json` reports how many were rejected.
 
+**Cross streets.** About 86,000 approximate projects have text in "Cross Streets", and 58,000 of those name two or
+more streets. `pipeline/src/lib/crossStreets.ts` matches those names against Census TIGER/Line roads (public domain)
+and places the project where the streets meet, inside or near the listed city or county. Names are matched strictly
+first ("Olive Ave" = "W Olive Ave", never "Olive St"), loosely only if that fails; crossings are found geometrically,
+so overpasses count; if the same pair of names crosses in several far-apart places, nothing is guessed. On the full
+dataset (2026‑11‑20): **33,281 placed (57.6%)**, 26.7% name a street the Census data doesn't have (typos, nicknames,
+old names), 13.3% name streets that don't meet. The rest are ambiguous or too far from the listed city.
+
 Ways to improve this later:
 
-1. Geocode the **cross streets** and **ZIP code** fields, which many coordinate‑less records have.
+1. A commercial geocoder (e.g. Geocodio) for the ~24,000 unmatched cross streets, and **ZIP code** areas.
 2. Match **parcel numbers** (APNs) against county parcel layers. Most precise, most work (58 counties, 58 formats).
 
 ## Status: inferred, not reported

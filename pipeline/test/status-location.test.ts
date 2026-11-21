@@ -195,6 +195,35 @@ describe('resolveLocation', () => {
     assert.equal(r, null);
   });
 
+  it('uses a cross-street placement ahead of city or county guesses', () => {
+    const hint = { lon: -122.37, lat: 40.6, streets: ['Market St', 'Shasta St'] as [string, string] };
+    const r = resolveLocation('x', [doc({ cities: ['Redding'] })], B, { crossStreets: hint });
+    assert.deepEqual(r, {
+      lon: -122.37,
+      lat: 40.6,
+      precision: 'intersection',
+      coordinatesRejected: false,
+      streets: hint.streets,
+    });
+  });
+
+  it('prefers valid agency coordinates over a cross-street placement', () => {
+    const hint = { lon: -122.37, lat: 40.6, streets: ['A St', 'B St'] as [string, string] };
+    const r = resolveLocation('x', [doc({ coordinates: '40.58, -122.39', cities: ['Redding'] })], B, {
+      crossStreets: hint,
+    });
+    assert.equal(r?.precision, 'exact');
+  });
+
+  it('uses cross streets when agency coordinates are rejected, and says so', () => {
+    const hint = { lon: -123.2, lat: 39.15, streets: ['A St', 'B St'] as [string, string] };
+    const r = resolveLocation('x', [doc({ coordinates: '36.2, -123.2', counties: ['Mendocino'] })], B, {
+      crossStreets: hint,
+    });
+    assert.equal(r?.precision, 'intersection');
+    assert.equal(r?.coordinatesRejected, true);
+  });
+
   it('places single-city projects inside the city, deterministically', () => {
     const d = [doc({ cities: ['Redding'], counties: ['Shasta'] })];
     const a = resolveLocation('2025100575', d, B)!;
@@ -316,6 +345,19 @@ describe('aggregate', () => {
     );
     assert.equal(r.points[0].properties.r, 1);
     assert.equal(r.points[0].properties.x, 0);
+  });
+
+  it('marks cross-street placements with their own symbol and counts them', () => {
+    const docs = [
+      doc({ sch: '1999011038', type: 'NOD', cities: [], counties: ['Shasta'], crossStreets: 'A St and B St' }),
+    ];
+    const placements = new Map([
+      ['1999011038', { lon: -122.2, lat: 40.7, streets: ['A St', 'B St'] as [string, string] }],
+    ]);
+    const r = aggregate(docs, B, TODAY, '2026-11-18T00:00:00Z', placements);
+    assert.equal(r.points[0].properties.x, 2);
+    assert.equal(r.counts.byPrecision.intersection, 1);
+    assert.deepEqual(r.projects[0].location?.streets, ['A St', 'B St']);
   });
 
   it('truncates hover titles on a word boundary-ish and collapses whitespace', () => {
