@@ -82,17 +82,17 @@ export function Legend({ meta, mode, scope, stages, onStages }: Props) {
             )}
             <hr />
             <ul className="legend-list precision">
-              <li>
+              <li title="Coordinates from the lead agency, or the street address in the project description">
                 <span className="dot solid" aria-hidden="true" />
-                <span className="legend-label">Exact location or street address</span>
+                <span className="legend-label">Exact location</span>
                 <span className="legend-count">{counts ? formatNumber(counts.byMark.exact) : ''}</span>
               </li>
-              <li>
+              <li title="Where the listed cross streets meet, or a place named in the project description">
                 <span className="dot cross" aria-hidden="true" />
-                <span className="legend-label">Near the listed cross streets or a named place</span>
+                <span className="legend-label">Near a named location</span>
                 <span className="legend-count">{counts ? formatNumber(counts.byMark.intersection) : ''}</span>
               </li>
-              <li>
+              <li title="Somewhere in the listed community, ZIP code, city or county">
                 <span className="dot ring" aria-hidden="true" />
                 <span className="legend-label">Approximate location</span>
                 <span className="legend-count">{counts ? formatNumber(counts.byMark.approx) : ''}</span>
