@@ -96,7 +96,8 @@ function samplingArea(a: Area): Area {
     const largest = signed.reduce((m, x, i) => (Math.abs(x) > Math.abs(signed[m]) ? i : m), 0);
     const outerSign = Math.sign(signed[largest]);
     const rings = a.shape.filter(
-      (_, i) => Math.sign(signed[i]) !== outerSign || Math.abs(signed[i]) >= Math.abs(signed[largest]) * MIN_PIECE_SHARE,
+      (_, i) =>
+        Math.sign(signed[i]) !== outerSign || Math.abs(signed[i]) >= Math.abs(signed[largest]) * MIN_PIECE_SHARE,
     );
     const shape = rings.length > 0 ? rings : a.shape;
     s = { ...a, shape, bbox: bboxOf(shape) };
