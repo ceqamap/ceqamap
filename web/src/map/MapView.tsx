@@ -2,9 +2,20 @@ import maplibregl, { type MapGeoJSONFeature, type Map as MapLibreMap, type Style
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Protocol } from 'pmtiles';
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
-import type { TilePointProperties } from '../../../packages/shared/src/index.ts';
+import type { ProjectStatus, TilePointProperties } from '../../../packages/shared/src/index.ts';
+import { pingProgress } from '../lib/motion.ts';
 import { type Basemap, GLYPHS } from './basemaps.ts';
-import { ensureProjectLayers, INTERACTIVE_LAYERS, LAYER, SOURCE_ID, SOURCE_LAYER } from './layers.ts';
+import {
+  applyStages,
+  arrivalOpacity,
+  arrivalRadius,
+  clusterCounts,
+  ensureProjectLayers,
+  INTERACTIVE_LAYERS,
+  LAYER,
+  SOURCE_ID,
+  SOURCE_LAYER,
+} from './layers.ts';
 
 /** California, with room for the header and legend. */
 export const CALIFORNIA_BOUNDS: [[number, number], [number, number]] = [
@@ -14,12 +25,14 @@ export const CALIFORNIA_BOUNDS: [[number, number], [number, number]] = [
 
 export type HoverInfo =
   | { kind: 'point'; x: number; y: number; props: TilePointProperties }
-  | { kind: 'cluster'; x: number; y: number; count: number; inReview: number };
+  | { kind: 'cluster'; x: number; y: number; count: number; inReview: number; arrived: number };
 
 export interface MapViewProps {
   basemap: Basemap;
   /** Absolute URL of the current .pmtiles file, or null while loading. */
   tilesUrl: string | null;
+  /** Stages the legend shows. */
+  stages: readonly ProjectStatus[];
   selected: string | null;
   /** Fly here when a project is opened from a link and is off-screen. */
   focus: { lon: number; lat: number } | null;
@@ -32,6 +45,8 @@ export interface MapViewHandle {
   zoomIn(): void;
   zoomOut(): void;
   resetView(): void;
+  /** Frame these positions (e.g. the latest arrivals). */
+  showPlaces(places: { lon: number; lat: number }[]): void;
 }
 
 const BLANK_STYLE: StyleSpecification = {
@@ -69,6 +84,18 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     zoomIn: () => mapRef.current?.zoomIn(),
     zoomOut: () => mapRef.current?.zoomOut(),
     resetView: () => mapRef.current?.fitBounds(CALIFORNIA_BOUNDS, { padding: fitPadding() }),
+    showPlaces: (places) => {
+      const map = mapRef.current;
+      if (!map || places.length === 0) return;
+      const duration = prefersReducedMotion() ? 0 : 1200;
+      if (places.length === 1) {
+        map.flyTo({ center: [places[0].lon, places[0].lat], zoom: Math.max(map.getZoom(), 12), duration });
+        return;
+      }
+      const bounds = new maplibregl.LngLatBounds();
+      for (const p of places) bounds.extend([p.lon, p.lat]);
+      map.fitBounds(bounds, { padding: fitPadding(), maxZoom: 12, duration });
+    },
   }));
 
   // --- Create the map once -------------------------------------------------
@@ -130,8 +157,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
             kind: 'cluster',
             x: e.point.x,
             y: e.point.y,
-            count: Number(f.properties.point_count),
-            inReview: Number(f.properties.r ?? 0),
+            ...clusterCounts(f.properties, latest.current.stages),
           });
         } else {
           latest.current.onHover({
@@ -163,7 +189,9 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
         }
       });
 
-      // Breathing halo around projects in public review.
+      // Breathing halo around projects in public review, and the header's
+      // ping around projects that just arrived. The frame timestamp shares
+      // performance.now()'s clock, which the header's ping is aligned to.
       if (!prefersReducedMotion()) {
         let last = 0;
         const tick = (t: number) => {
@@ -173,6 +201,15 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
           const phase = (t % 2400) / 2400;
           map!.setPaintProperty(LAYER.pulse, 'circle-radius', 6 + phase * 14);
           map!.setPaintProperty(LAYER.pulse, 'circle-opacity', 0.35 * (1 - phase));
+          if (map!.getLayer(LAYER.arrivals)) {
+            const ping = pingProgress(t);
+            map!.setPaintProperty(
+              LAYER.arrivals,
+              'circle-radius',
+              arrivalRadius(latest.current.stages, ping, latest.current.selected),
+            );
+            map!.setPaintProperty(LAYER.arrivals, 'circle-stroke-opacity', arrivalOpacity(ping));
+          }
         };
         raf = requestAnimationFrame(tick);
       }
@@ -181,7 +218,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     function addDataLayers(m: MapLibreMap) {
       const { tilesUrl, basemap } = latest.current;
       if (!tilesUrl) return;
-      ensureProjectLayers(m, tilesUrl, { mode: basemap.mode });
+      ensureProjectLayers(m, tilesUrl, { mode: basemap.mode, stages: latest.current.stages });
       appliedTiles.current = tilesUrl;
       // Feature state does not survive a style change; restore the selection.
       hoveredId.current = null;
@@ -224,9 +261,20 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     if (!map || !props.tilesUrl || appliedTiles.current === props.tilesUrl || !styleReady.current) return;
     const source = map.getSource(SOURCE_ID) as maplibregl.VectorTileSource | undefined;
     if (source) source.setUrl(`pmtiles://${props.tilesUrl}`);
-    else ensureProjectLayers(map, props.tilesUrl, { mode: props.basemap.mode });
+    else ensureProjectLayers(map, props.tilesUrl, { mode: props.basemap.mode, stages: latest.current.stages });
     appliedTiles.current = props.tilesUrl;
   }, [props.tilesUrl, props.basemap.mode]);
+
+  // --- Legend stage filter: restyle in place, no tile reload ---------------
+  const appliedStages = useRef(props.stages);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (appliedStages.current === props.stages) return;
+    appliedStages.current = props.stages;
+    // Before the style is ready, style.load adds the layers with the latest stages.
+    if (!map || !styleReady.current || !map.getSource(SOURCE_ID)) return;
+    applyStages(map, { mode: props.basemap.mode, stages: props.stages });
+  }, [props.stages, props.basemap.mode]);
 
   // --- Selection highlight -------------------------------------------------
   useEffect(() => {

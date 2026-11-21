@@ -241,7 +241,54 @@ export interface PublishedMeta {
     /** Projects whose agency coordinates were discarded as inconsistent. */
     coordinatesRejected?: number;
   };
+  /**
+   * One clustered tileset per time window (see TIME_SCOPES). Absent in data
+   * built before 2026-11-21; the app then falls back to `tiles`.
+   */
+  scopes?: Record<TimeScope, PublishedScope>;
+  /** Projects with filings first seen in the most recent batch that brought any. */
+  arrivals?: PublishedArrivals;
 }
+
+/** A time window's tileset and the counts of what it shows (mapped projects only). */
+export interface PublishedScope {
+  /** Path (relative to the data origin) of this window's tileset. */
+  tiles: string;
+  mapped: number;
+  byStatus: Record<ProjectStatus, number>;
+  /** By map mark: exact (solid), intersection (lighter center), approx (ring). */
+  byMark: { exact: number; intersection: number; approx: number };
+}
+
+/**
+ * The latest batch of arrivals. "Arrived" means first seen by our pipeline,
+ * not CEQAnet's Received date (documents are often posted days later).
+ */
+export interface PublishedArrivals {
+  /** ISO timestamp of the ingest run that first saw these documents. */
+  at: string;
+  /** Projects whose first filing arrived in this batch. */
+  projects: number;
+  /** Existing projects that received a new filing in this batch. */
+  filings: number;
+  items: PublishedArrival[];
+}
+
+export interface PublishedArrival {
+  /** SCH number. */
+  id: string;
+  /** 'project': a brand-new SCH number. 'filing': a new document on an existing project. */
+  kind: 'project' | 'filing';
+  /** Document type code of the newest arriving document (e.g. NOD). */
+  type: string;
+  typeLabel: string;
+  /** Map position, or null for projects without a single location. */
+  lon: number | null;
+  lat: number | null;
+}
+
+/** Tile property `n`: 1 if the project arrived in the latest batch (details in meta.arrivals). */
+export type ArrivalFlag = 0 | 1;
 
 /**
  * Attributes stored on each point in the vector tiles. Kept deliberately
@@ -258,4 +305,83 @@ export interface TilePointProperties {
   x: 0 | 1 | 2;
   /** 1 if in review (summed by clustering). */
   r: 0 | 1;
+  /** Arrived in the latest batch (summed by clustering, so clusters know). */
+  n?: ArrivalFlag;
+  /**
+   * One flag per stage (`c_in_review`, `c_scoping`, ...), 1 for this project's
+   * stage. Summed by clustering, so a cluster's count can follow the legend's
+   * stage filter without rebuilding tiles.
+   */
+  [stageCount: `c_${string}`]: 0 | 1 | undefined;
+}
+
+/** Tile attribute holding a stage's count (see TilePointProperties). */
+export function stageCountKey(status: ProjectStatus): `c_${ProjectStatus}` {
+  return `c_${status}`;
+}
+
+/** The per-stage flags for one project's tile point. */
+export function stageFlags(status: ProjectStatus): Record<`c_${ProjectStatus}`, 0 | 1> {
+  const out = {} as Record<`c_${ProjectStatus}`, 0 | 1>;
+  for (const s of STATUSES) out[stageCountKey(s.id)] = s.id === status ? 1 : 0;
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Time windows
+// ---------------------------------------------------------------------------
+
+export type TimeScope = '30d' | '12m' | '5y' | 'all';
+
+export interface TimeScopeDefinition {
+  id: TimeScope;
+  label: string;
+  /** Window length in days, or null for all time. */
+  days: number | null;
+}
+
+/**
+ * A project is in a window if its latest filing was received within it. Projects
+ * in public review, and projects that just arrived, are in every window: an
+ * open comment period is the most useful thing on the map, and a document
+ * CEQAnet posts late (older Received date) is still news to us.
+ */
+export const TIME_SCOPES: readonly TimeScopeDefinition[] = [
+  { id: '30d', label: 'Past 30 days', days: 30 },
+  { id: '12m', label: 'Past 12 months', days: 365 },
+  { id: '5y', label: 'Past 5 years', days: 5 * 365 + 1 },
+  { id: 'all', label: 'All time', days: null },
+] as const;
+
+export const DEFAULT_TIME_SCOPE: TimeScope = '12m';
+
+export function isTimeScope(v: unknown): v is TimeScope {
+  return TIME_SCOPES.some((s) => s.id === v);
+}
+
+/** First day (YYYY-MM-DD) inside the window, or null for all time. */
+export function scopeStart(scope: TimeScope, today: string): string | null {
+  const days = TIME_SCOPES.find((s) => s.id === scope)?.days ?? null;
+  if (days === null) return null;
+  const d = new Date(`${today}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - days + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+export function inScope(
+  scope: TimeScope,
+  today: string,
+  project: { lastFiling: string; status: ProjectStatus; arrived?: boolean },
+): boolean {
+  if (project.status === 'in_review' || project.arrived) return true;
+  const start = scopeStart(scope, today);
+  return start === null || project.lastFiling >= start;
+}
+
+/** The narrowest window that shows this project (for links to older projects). */
+export function narrowestScopeFor(
+  today: string,
+  project: { lastFiling: string; status: ProjectStatus; arrived?: boolean },
+): TimeScope {
+  return TIME_SCOPES.find((s) => inScope(s.id, today, project))?.id ?? 'all';
 }

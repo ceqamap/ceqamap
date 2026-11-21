@@ -122,6 +122,20 @@ Honest caveats, also shown to visitors in the drawer:
   determination was filed, not that anything was built.
 - Status depends on the date (comment periods open and close), so the data is rebuilt at least daily.
 
+## Arrivals ("new" on the map)
+
+"New" means first seen by our pipeline, not CEQAnet's Received date: agencies' documents often appear days after the
+date they were received, and every run refetches 21 days. Ingest compares document keys against what is stored and
+saves the new ones as the latest batch (`state/arrivals.json`). Edits to known documents don't count.
+
+- A project is a **new project** if all its documents arrived in the batch, otherwise an existing project with a **new
+  filing**.
+- A run with nothing new keeps the previous batch, so pings survive nights and weekends. A batch older than 14 days
+  stops pinging (a stalled pipeline shouldn't show week-old filings as new).
+- A run with more than 500 new documents is treated as a bulk change (first run, re-keying) and clears the pings.
+- Documents without a CEQAnet link get a synthetic key; if one later gains a link it may show as new once.
+- Until the first ingest saves a batch, the build approximates one from CEQAnet's most recent Posted date.
+
 ## Refresh cadence
 
 Every 3 hours the pipeline refetches the last 21 days (CEQAnet posts some documents days after their received date

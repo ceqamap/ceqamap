@@ -22,6 +22,32 @@ the filing timeline), and the green "live" pulse.
 | Hollow ring    | Approximate location (city or county)                                |
 | Cluster ring   | Hairline circle with count; **green ring** = contains an open review |
 | Breathing halo | Project in public review right now (off with reduced motion)         |
+| Ping ring      | Arrived in the latest batch; same ring as the header's live dot      |
+
+### Default view and filters
+
+The map opens on **projects with a filing in the past 12 months**, not all 335,000. Recency is the one sign of life
+the data records reliably. A stage-based default ("hide finished projects") would surface decades of projects stuck at
+Review closed because their Notice of Determination went only to the county clerk. Twelve months, not 90 days,
+because a CEQA process often runs one to three years from scoping to approval. Projects in public review, and projects
+that just arrived, are in every window.
+
+Two filters, both in existing UI and both kept in the URL (`?t=30d&stages=in_review,scoping`):
+
+- **Time window**: the header's count is a menu (Past 30 days, Past 12 months, Past 5 years, All time).
+- **Stage**: the legend is the filter. Click a stage to hide or show it; Alt/Option-click to show only that stage.
+
+Each window is its own clustered tileset, so cluster counts are exact. Clusters carry per-stage counts, so the stage
+filter restyles the map in place without loading tiles. (Clusters are positioned using every stage, so with stages
+hidden a cluster may sit slightly off the center of what it still counts.)
+
+### Arrivals
+
+Projects whose documents our pipeline saw for the first time in the latest batch get the header's ping: a hairline
+green ring that grows and fades, on the same 2.4 s clock as the live dot (see `web/src/lib/motion.ts`). Clusters ping
+if they contain one. The in-review halo is soft and blurred so the two don't read as the same signal. The header's
+"N new" link visits them one at a time (fly there, open the drawer); hovering says "New project" or "New filing: Notice of Determination". The batch is
+replaced only by the next run that brings new documents, so the pings stay up overnight and over weekends.
 
 ### Stage colors
 

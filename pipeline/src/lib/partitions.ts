@@ -57,16 +57,20 @@ export function mergeWindow(
   fetched: CeqaDocument[],
   start: string,
   end: string,
-): { docs: CeqaDocument[]; changed: boolean } {
+): { docs: CeqaDocument[]; changed: boolean; added: CeqaDocument[] } {
   const outside = existing.filter((d) => d.received < start || d.received > end);
   const byKey = new Map<string, CeqaDocument>();
   for (const d of fetched) byKey.set(d.key, d); // last one wins on duplicates
   const merged = [...outside, ...byKey.values()];
+  // Documents we have never stored before, by key. Edits to known documents
+  // and documents whose Received date moved are not arrivals.
+  const known = new Set(existing.map((d) => d.key));
+  const added = [...byKey.values()].filter((d) => !known.has(d.key));
 
   const fingerprint = (docs: CeqaDocument[]) =>
     docs
       .map((d) => JSON.stringify(d))
       .sort()
       .join('\n');
-  return { docs: merged, changed: fingerprint(existing) !== fingerprint(merged) };
+  return { docs: merged, changed: fingerprint(existing) !== fingerprint(merged), added };
 }

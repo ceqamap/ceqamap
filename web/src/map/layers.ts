@@ -1,5 +1,5 @@
 import type { ExpressionSpecification, LayerSpecification, Map as MapLibreMap } from 'maplibre-gl';
-import { STATUSES } from '../../../packages/shared/src/index.ts';
+import { type ProjectStatus, STATUSES, stageCountKey } from '../../../packages/shared/src/index.ts';
 import { LABEL_FONT } from './basemaps.ts';
 
 /**
@@ -12,6 +12,12 @@ import { LABEL_FONT } from './basemaps.ts';
  *   clusters    hairline circles sized by count, echoing the reference site's
  *               node graph; a green ring means at least one project inside is
  *               in public review right now
+ *   arrivals    a hairline ring that grows and fades (the header's "ping") around
+ *               projects, and clusters of projects, that arrived in the latest batch
+ *
+ * The legend's stage filter is applied here: points by their stage, clusters
+ * by summing the per-stage counts tippecanoe accumulated (c_in_review, ...).
+ * Data built before those counts existed falls back to point_count.
  */
 
 export const SOURCE_ID = 'projects';
@@ -24,11 +30,89 @@ export const LAYER = {
   crossStreets: 'projects-cross-streets',
   crossStreetsCenter: 'projects-cross-streets-center',
   pulse: 'projects-pulse',
+  arrivals: 'projects-arrivals',
 } as const;
 export const INTERACTIVE_LAYERS = [LAYER.clusters, LAYER.exact, LAYER.crossStreets, LAYER.approx];
 
 export interface LayerTheme {
   mode: 'light' | 'dark';
+  /** Stages the legend shows. */
+  stages: readonly ProjectStatus[];
+}
+
+/** Projects in a cluster that belong to the shown stages. */
+function clusterCountExpr(stages: readonly ProjectStatus[]): ExpressionSpecification {
+  const terms = stages.map((s) => ['coalesce', ['get', stageCountKey(s)], 0]);
+  return [
+    'case',
+    ['has', stageCountKey('in_review')],
+    ['+', 0, 0, ...terms],
+    ['get', 'point_count'],
+  ] as unknown as ExpressionSpecification;
+}
+
+/** In-review projects in a cluster, if the in-review stage is shown. */
+function clusterInReviewExpr(stages: readonly ProjectStatus[]): ExpressionSpecification | number {
+  if (!stages.includes('in_review')) return 0;
+  return ['coalesce', ['get', stageCountKey('in_review')], ['get', 'r'], 0] as unknown as ExpressionSpecification;
+}
+
+function stageFilter(stages: readonly ProjectStatus[]): ExpressionSpecification {
+  return ['in', ['get', 's'], ['literal', [...stages]]] as unknown as ExpressionSpecification;
+}
+
+/** The same counts in JavaScript, for the hover card. */
+export function clusterCounts(props: Record<string, unknown>, stages: readonly ProjectStatus[]) {
+  const num = (v: unknown) => (typeof v === 'number' ? v : Number(v ?? 0) || 0);
+  const hasStages = props[stageCountKey('in_review')] !== undefined;
+  const count = hasStages ? stages.reduce((n, s) => n + num(props[stageCountKey(s)]), 0) : num(props.point_count);
+  const inReview = stages.includes('in_review') ? num(props[stageCountKey('in_review')] ?? props.r) : 0;
+  return { count, inReview, arrived: num(props.n) };
+}
+
+const clusterRadiusSteps = [11, 25, 14, 100, 18, 1000, 24, 5000, 30];
+
+function clusterRadiusExpr(stages: readonly ProjectStatus[]): ExpressionSpecification {
+  return ['step', clusterCountExpr(stages), ...clusterRadiusSteps] as unknown as ExpressionSpecification;
+}
+
+/**
+ * Ping ring size: from just outside the dot (or cluster) edge, growing by up to
+ * 10 px. Follows the dots' zoom curve and selection size (see pointRadius) so
+ * the ring is never hidden under its own dot.
+ */
+export function arrivalRadius(
+  stages: readonly ProjectStatus[],
+  progress: number,
+  selectedId: string | null = null,
+): ExpressionSpecification {
+  const grow = progress * 10;
+  const at = (dot: number, selectedDot: number) => [
+    'case',
+    ['has', 'point_count'],
+    ['+', clusterRadiusExpr(stages), 1 + grow],
+    // By id rather than feature-state, which this layer did not pick up
+    // reliably while its radius is re-set every frame (2026-11-21).
+    ['==', ['to-string', ['get', 'id']], selectedId ?? ''],
+    selectedDot + 2 + grow,
+    dot + 2 + grow,
+  ];
+  return [
+    'interpolate',
+    ['linear'],
+    ['zoom'],
+    4,
+    at(2.4, 8),
+    10,
+    at(4, 9),
+    15,
+    at(7.2, 11),
+  ] as unknown as ExpressionSpecification;
+}
+
+/** Ping ring opacity at eased progress 0..1 (matches the header's keyframes). */
+export function arrivalOpacity(progress: number): number {
+  return 0.9 * (1 - progress);
 }
 
 function statusColor(mode: 'light' | 'dark'): ExpressionSpecification {
@@ -69,12 +153,17 @@ function pointRadius(base: number, scale = 1): ExpressionSpecification {
   ] as ExpressionSpecification;
 }
 
-export function projectLayers({ mode }: LayerTheme): LayerSpecification[] {
+export function projectLayers({ mode, stages }: LayerTheme): LayerSpecification[] {
   const surface = mode === 'light' ? '#f4f2ee' : '#121212';
   const ink = mode === 'light' ? '#151515' : '#efede8';
   const card = mode === 'light' ? '#faf9f6' : '#1a1a1a';
   const color = statusColor(mode);
   const green = STATUSES[0][mode];
+  const count = clusterCountExpr(stages);
+  const inReview = clusterInReviewExpr(stages);
+  const clusterFilter = ['all', isCluster, ['>', count, 0]] as unknown as ExpressionSpecification;
+  const hasOpenReview = ['>', inReview, 0] as unknown as ExpressionSpecification;
+  const shown = stageFilter(stages);
 
   return [
     {
@@ -82,13 +171,13 @@ export function projectLayers({ mode }: LayerTheme): LayerSpecification[] {
       type: 'circle',
       source: SOURCE_ID,
       'source-layer': SOURCE_LAYER,
-      filter: isCluster,
+      filter: clusterFilter,
       paint: {
         'circle-color': card,
         'circle-opacity': 0.92,
-        'circle-radius': ['step', ['get', 'point_count'], 11, 25, 14, 100, 18, 1000, 24, 5000, 30],
-        'circle-stroke-color': ['case', ['>', ['coalesce', ['get', 'r'], 0], 0], green, ink],
-        'circle-stroke-width': ['case', ['>', ['coalesce', ['get', 'r'], 0], 0], 2, 0.75],
+        'circle-radius': clusterRadiusExpr(stages),
+        'circle-stroke-color': ['case', hasOpenReview, green, ink],
+        'circle-stroke-width': ['case', hasOpenReview, 2, 0.75],
       },
     },
     {
@@ -96,17 +185,17 @@ export function projectLayers({ mode }: LayerTheme): LayerSpecification[] {
       type: 'symbol',
       source: SOURCE_ID,
       'source-layer': SOURCE_LAYER,
-      filter: isCluster,
+      filter: clusterFilter,
       layout: {
         // 1284 -> "1.3k". Computed here rather than relying on a tippecanoe-specific attribute.
         'text-field': [
           'case',
-          ['>=', ['get', 'point_count'], 1000],
-          ['concat', ['to-string', ['/', ['round', ['/', ['get', 'point_count'], 100]], 10]], 'k'],
-          ['to-string', ['get', 'point_count']],
-        ],
+          ['>=', count, 1000],
+          ['concat', ['to-string', ['/', ['round', ['/', count, 100]], 10]], 'k'],
+          ['to-string', count],
+        ] as unknown as ExpressionSpecification,
         'text-font': LABEL_FONT,
-        'text-size': ['step', ['get', 'point_count'], 10, 1000, 11],
+        'text-size': ['step', count, 10, 1000, 11] as unknown as ExpressionSpecification,
         'text-allow-overlap': true,
       },
       paint: { 'text-color': ink },
@@ -117,7 +206,7 @@ export function projectLayers({ mode }: LayerTheme): LayerSpecification[] {
       type: 'circle',
       source: SOURCE_ID,
       'source-layer': SOURCE_LAYER,
-      filter: ['all', notCluster, ['==', ['get', 'x'], 0]],
+      filter: ['all', notCluster, ['==', ['get', 'x'], 0], shown],
       layout: { 'circle-sort-key': sortKey },
       paint: {
         'circle-radius': pointRadius(3.5),
@@ -134,7 +223,7 @@ export function projectLayers({ mode }: LayerTheme): LayerSpecification[] {
       type: 'circle',
       source: SOURCE_ID,
       'source-layer': SOURCE_LAYER,
-      filter: ['all', notCluster, ['==', ['get', 'x'], 1]],
+      filter: ['all', notCluster, ['==', ['get', 'x'], 1], shown],
       layout: { 'circle-sort-key': sortKey },
       paint: {
         'circle-radius': pointRadius(4),
@@ -149,7 +238,7 @@ export function projectLayers({ mode }: LayerTheme): LayerSpecification[] {
       type: 'circle',
       source: SOURCE_ID,
       'source-layer': SOURCE_LAYER,
-      filter: ['all', notCluster, ['==', ['get', 'x'], 2]],
+      filter: ['all', notCluster, ['==', ['get', 'x'], 2], shown],
       layout: { 'circle-sort-key': sortKey },
       paint: {
         'circle-radius': pointRadius(4),
@@ -164,7 +253,7 @@ export function projectLayers({ mode }: LayerTheme): LayerSpecification[] {
       type: 'circle',
       source: SOURCE_ID,
       'source-layer': SOURCE_LAYER,
-      filter: ['all', notCluster, ['==', ['get', 'x'], 2]],
+      filter: ['all', notCluster, ['==', ['get', 'x'], 2], shown],
       layout: { 'circle-sort-key': sortKey },
       paint: {
         'circle-radius': pointRadius(4, 0.45),
@@ -178,7 +267,7 @@ export function projectLayers({ mode }: LayerTheme): LayerSpecification[] {
       type: 'circle',
       source: SOURCE_ID,
       'source-layer': SOURCE_LAYER,
-      filter: ['all', notCluster, ['==', ['get', 's'], 'in_review']],
+      filter: ['all', notCluster, ['==', ['get', 's'], 'in_review'], shown],
       paint: {
         'circle-radius': 8,
         'circle-color': green,
@@ -186,7 +275,47 @@ export function projectLayers({ mode }: LayerTheme): LayerSpecification[] {
         'circle-blur': 0.6,
       },
     },
+    {
+      // The header's ping, around projects that arrived in the latest batch
+      // (radius and opacity animated in MapView; these values are the still
+      // frame shown with reduced motion). Clusters ping if they contain one.
+      id: LAYER.arrivals,
+      type: 'circle',
+      source: SOURCE_ID,
+      'source-layer': SOURCE_LAYER,
+      filter: [
+        'all',
+        ['>', ['coalesce', ['get', 'n'], 0], 0],
+        ['any', clusterFilter, ['all', notCluster, shown]],
+      ] as unknown as ExpressionSpecification,
+      paint: {
+        'circle-radius': arrivalRadius(stages, 0.45),
+        'circle-color': 'rgba(0, 0, 0, 0)',
+        'circle-stroke-color': green,
+        'circle-stroke-width': 1.25,
+        'circle-stroke-opacity': 0.75,
+      },
+    },
   ];
+}
+
+/** Paint properties MapView animates; re-applying the stage filter leaves them alone. */
+const ANIMATED: Record<string, string[]> = {
+  [LAYER.pulse]: ['circle-radius', 'circle-opacity'],
+  [LAYER.arrivals]: ['circle-stroke-opacity'],
+};
+
+/** Apply a new stage selection to layers already on the map, without reloading tiles. */
+export function applyStages(map: MapLibreMap, theme: LayerTheme) {
+  for (const layer of projectLayers(theme)) {
+    if (!map.getLayer(layer.id) || !('filter' in layer)) continue;
+    map.setFilter(layer.id, layer.filter ?? null);
+    const skip = ANIMATED[layer.id] ?? [];
+    for (const [k, v] of Object.entries(layer.paint ?? {})) {
+      if (!skip.includes(k)) map.setPaintProperty(layer.id, k, v);
+    }
+    for (const [k, v] of Object.entries(layer.layout ?? {})) map.setLayoutProperty(layer.id, k, v);
+  }
 }
 
 /** Add (or re-add after a basemap switch) the data source and layers. */
@@ -197,13 +326,14 @@ export function ensureProjectLayers(map: MapLibreMap, tilesUrl: string, theme: L
   for (const layer of projectLayers(theme)) {
     if (map.getLayer(layer.id)) map.removeLayer(layer.id);
   }
-  // Pulse sits beneath the dots; clusters on top of everything.
+  // Pulse sits beneath the dots, arrival rings above them; clusters on top of everything.
   const order = [
     LAYER.pulse,
     LAYER.approx,
     LAYER.crossStreets,
     LAYER.crossStreetsCenter,
     LAYER.exact,
+    LAYER.arrivals,
     LAYER.clusters,
     LAYER.clusterCount,
   ];
