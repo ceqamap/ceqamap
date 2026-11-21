@@ -49,6 +49,6 @@ jobs:
           path: pipeline/data/boundaries.json
           key: boundaries-${{ hashFiles('pipeline/scripts/fetch-boundaries.ts', 'pipeline/src/lib/boundaries.ts', 'pipeline/src/lib/geometry.ts', 'pipeline/src/lib/shapefile.ts') }}
       - name: Ensure city, county and ZIP boundaries
-        run: test -f pipeline/data/boundaries.json || NODE_OPTIONS=--max-old-space-size=8192 pnpm --filter @ceqa-atlas/pipeline boundaries
+        run: node pipeline/scripts/boundaries-current.ts || NODE_OPTIONS=--max-old-space-size=8192 pnpm --filter @ceqa-atlas/pipeline boundaries
       - name: Run
         run: node --max-old-space-size=6144 pipeline/scripts/${{ inputs.script || 'match-intersections' }}.ts

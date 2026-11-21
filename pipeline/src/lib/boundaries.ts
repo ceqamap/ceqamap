@@ -21,13 +21,19 @@ export interface Area {
   shape: Shape;
 }
 
+/** Bump when the shape of boundaries.json changes, so CI regenerates it. */
+export const BOUNDARIES_FORMAT = 2;
+
 export interface Boundaries {
+  format?: number;
   vintage?: string;
   zipVintage?: string;
   places: Record<string, Area>;
   counties: Record<string, Area>;
   /** California ZIP Code Tabulation Areas, keyed by 5-digit ZIP. */
   zips?: Record<string, Area>;
+  /** Counties of Oregon, Nevada and Arizona: land where a California project can't be. */
+  neighbors?: Area[];
 }
 
 /**
@@ -67,6 +73,8 @@ function round5(n: number) {
  * Build the lookup from Census features. Places: prefer incorporated cities
  * over Census-designated places (CDPs) when two names collide.
  */
+const NEIGHBOR_STATES = new Set(['04', '32', '41']); // Arizona, Nevada, Oregon
+
 export function buildBoundaries(
   places: ShapefileFeature[],
   counties: ShapefileFeature[],
@@ -88,6 +96,10 @@ export function buildBoundaries(
   return {
     places: index(places, (f) => f.properties.LSAD === '57'), // 57 = CDP
     counties: index(counties, () => false),
+    neighbors: counties
+      .filter((f) => f.shape && NEIGHBOR_STATES.has(f.properties.STATEFP))
+      .map((f) => toArea(f.properties.NAME, f.shape!))
+      .filter((a): a is Area => a !== null),
   };
 }
 

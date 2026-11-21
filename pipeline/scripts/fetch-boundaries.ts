@@ -12,7 +12,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildBoundaries, buildZips } from '../src/lib/boundaries.ts';
+import { BOUNDARIES_FORMAT, buildBoundaries, buildZips } from '../src/lib/boundaries.ts';
 import { readShapefile } from '../src/lib/shapefile.ts';
 
 const VINTAGE = process.env.BOUNDARY_VINTAGE ?? '2024';
@@ -49,6 +49,7 @@ for (const v of [VINTAGE, '2023', '2020']) {
 if (!zctas) throw new Error('No ZCTA file found');
 const b = { ...buildBoundaries(places, counties), zips: buildZips(zctas) };
 const nZips = Object.keys(b.zips).length;
+if ((b.neighbors?.length ?? 0) < 60) throw new Error(`Unexpected count: ${b.neighbors?.length} neighboring counties`);
 if (nZips < 1500) throw new Error(`Unexpected count: ${nZips} ZIP areas`);
 const nPlaces = Object.keys(b.places).length;
 const nCounties = Object.keys(b.counties).length;
@@ -57,6 +58,6 @@ if (nPlaces < 1000 || nCounties !== 58) throw new Error(`Unexpected counts: ${nP
 await mkdir(new URL('../data/', import.meta.url), { recursive: true });
 await writeFile(
   new URL('../data/boundaries.json', import.meta.url),
-  JSON.stringify({ ...b, vintage: VINTAGE, zipVintage: zctaVintage }),
+  JSON.stringify({ format: BOUNDARIES_FORMAT, ...b, vintage: VINTAGE, zipVintage: zctaVintage }),
 );
 console.log(`Wrote ${nPlaces} places, ${nCounties} counties and ${nZips} ZIP areas (ZCTA ${zctaVintage})`);

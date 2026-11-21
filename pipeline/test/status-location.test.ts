@@ -175,6 +175,30 @@ describe('resolveLocation', () => {
     assert.equal(r.coordinatesRejected, true);
   });
 
+  it('rejects coordinates across the Mexican border, even within 5 km of the county (SCH 2011081008)', () => {
+    const b2: Boundaries = {
+      ...B,
+      counties: { ...B.counties, 'san diego': area('San Diego', rect(-117.6, 32.534, -116.08, 33.51)) },
+    };
+    const r = resolveLocation('2011081008', [doc({ coordinates: '32.5, -117.033333', counties: ['San Diego'] })], b2)!;
+    assert.equal(r.precision, 'county');
+    assert.equal(r.coordinatesRejected, true);
+    // Offshore of San Diego (US waters) is still fine.
+    const sea = resolveLocation('x', [doc({ coordinates: '32.7, -117.3', counties: ['San Diego'] })], b2)!;
+    assert.equal(sea.precision, 'exact');
+  });
+
+  it('rejects coordinates inside a neighboring state', () => {
+    const b2: Boundaries = { ...B, neighbors: [area('Washoe', rect(-120.0, 39.0, -119.0, 41.0))] };
+    // Just over the line from a county stretched to the border for this test.
+    const b3: Boundaries = {
+      ...b2,
+      counties: { ...b2.counties, nevada: area('Nevada', rect(-121.3, 39.0, -120.0, 39.6)) },
+    };
+    const r = resolveLocation('x', [doc({ coordinates: '39.3, -119.98', counties: ['Nevada'] })], b3)!;
+    assert.equal(r.coordinatesRejected, true);
+  });
+
   it('accepts coordinates a few km outside the listed city', () => {
     const r = resolveLocation('x', [doc({ coordinates: '40.70, -122.40', cities: ['Redding'] })], B);
     assert.equal(r?.precision, 'exact');
