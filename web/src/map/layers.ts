@@ -76,13 +76,31 @@ function clusterRadiusExpr(stages: readonly ProjectStatus[]): ExpressionSpecific
   return ['step', clusterCountExpr(stages), ...clusterRadiusSteps] as unknown as ExpressionSpecification;
 }
 
-/** Ping ring size, from the point (or cluster) edge outward by `grow` pixels. */
+/**
+ * Ping ring size: from just outside the dot (or cluster) edge, growing by up to
+ * 10 px. Follows the dots' zoom curve and selection size (see pointRadius) so
+ * the ring is never hidden under its own dot.
+ */
 export function arrivalRadius(stages: readonly ProjectStatus[], progress: number): ExpressionSpecification {
-  return [
+  const grow = progress * 10;
+  const at = (dot: number, selectedDot: number) => [
     'case',
     ['has', 'point_count'],
-    ['+', clusterRadiusExpr(stages), 1 + progress * 10],
-    4.5 + progress * 9,
+    ['+', clusterRadiusExpr(stages), 1 + grow],
+    ['boolean', ['feature-state', 'selected'], false],
+    selectedDot + 2 + grow,
+    dot + 2 + grow,
+  ];
+  return [
+    'interpolate',
+    ['linear'],
+    ['zoom'],
+    4,
+    at(2.4, 8),
+    10,
+    at(4, 9),
+    15,
+    at(7.2, 11),
   ] as unknown as ExpressionSpecification;
 }
 
