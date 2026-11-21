@@ -115,6 +115,52 @@ export function crossings(a: Line[], b: Line[]): { lon: number; lat: number }[] 
   return out;
 }
 
+/** Roads that end this close to another named road are treated as meeting it. */
+export const NEAR_MEET_KM = 0.06;
+
+/** Shortest distance (km) from a point to segment q1-q2, in a local flat projection. */
+function pointSegmentKm(p: [number, number], q1: [number, number], q2: [number, number]): number {
+  const kx = 111.32 * Math.cos((p[1] * Math.PI) / 180);
+  const ky = 111.32;
+  const ax = (q1[0] - p[0]) * kx;
+  const ay = (q1[1] - p[1]) * ky;
+  const bx = (q2[0] - p[0]) * kx;
+  const by = (q2[1] - p[1]) * ky;
+  const dx = bx - ax;
+  const dy = by - ay;
+  const len2 = dx * dx + dy * dy;
+  const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, -(ax * dx + ay * dy) / len2));
+  return Math.hypot(ax + t * dx, ay + t * dy);
+}
+
+/**
+ * Where a line of one road ends within NEAR_MEET_KM of the other road: gaps
+ * at roundabouts, interchanges and slightly misaligned geometry.
+ */
+export function nearMeetings(a: Line[], b: Line[]): { lon: number; lat: number }[] {
+  const pad = NEAR_MEET_KM / 80;
+  const out: { lon: number; lat: number }[] = [];
+  const check = (from: Line[], to: Line[]) => {
+    for (const l of from) {
+      for (const end of [l.coords[0], l.coords[l.coords.length - 1]]) {
+        for (const m of to) {
+          const bb = m.bbox;
+          if (end[0] < bb[0] - pad || end[0] > bb[2] + pad || end[1] < bb[1] - pad || end[1] > bb[3] + pad) continue;
+          for (let j = 1; j < m.coords.length; j++) {
+            if (pointSegmentKm(end, m.coords[j - 1], m.coords[j]) <= NEAR_MEET_KM) {
+              out.push({ lon: end[0], lat: end[1] });
+              break;
+            }
+          }
+        }
+      }
+    }
+  };
+  check(a, b);
+  check(b, a);
+  return out;
+}
+
 export type IntersectionResult =
   | { ok: true; lon: number; lat: number; streets: [string, string] }
   | { ok: false; reason: 'no-names' | 'street-not-found' | 'no-crossing' | 'ambiguous' | 'outside-area' };
@@ -169,6 +215,7 @@ function match(
     for (let j = i + 1; j < names.length; j++) {
       if (!lines[i] || !lines[j]) continue;
       let points = crossings(lines[i]!, lines[j]!);
+      if (points.length === 0) points = nearMeetings(lines[i]!, lines[j]!);
       if (points.length === 0) continue;
       sawCrossing = true;
       if (area.county) points = points.filter((p) => distanceToShapeKm(p.lon, p.lat, area.county!.shape) <= 0.5);

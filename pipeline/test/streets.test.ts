@@ -117,6 +117,21 @@ describe('findIntersection', () => {
     assert.equal(r.ok && r.lon, -118.2);
   });
 
+  it('treats a street ending within 60 m of another as meeting it (roundabout gaps)', () => {
+    const idx = buildRoadIndex(
+      [
+        // Hot Springs Rd stops ~40 m short of Olive Mill Rd (an unnamed roundabout in between).
+        road('Olive Mill Rd', [-119.63, 34.42], [-119.63, 34.44]),
+        road('Hot Springs Rd', [-119.6296, 34.43], [-119.62, 34.435]),
+        road('Far Rd', [-119.6, 34.43], [-119.59, 34.43]),
+      ],
+      new Set(['olive mill rd', 'olive mill', 'hot springs rd', 'hot springs', 'far rd', 'far']),
+    );
+    const r = findIntersection(idx, ['Olive Mill Rd.', 'Hot Springs Road'], {});
+    assert.ok(r.ok);
+    assert.deepEqual(findIntersection(idx, ['Olive Mill Rd', 'Far Rd'], {}), { ok: false, reason: 'no-crossing' });
+  });
+
   it('finds crossings with no shared vertex (overpasses)', () => {
     const idx = buildRoadIndex(
       [road('US Hwy 101', [-122.0, 37.0], [-122.0, 37.2]), road('Becker Ln', [-122.1, 37.1], [-121.9, 37.1])],
