@@ -265,7 +265,7 @@ function placeInZip(
 
 // The California-Mexico border is a straight line from the Pacific, just south
 // of San Diego Bay, to the Colorado River.
-const BORDER_WEST = { lon: -117.1240, lat: 32.5343 };
+const BORDER_WEST = { lon: -117.124, lat: 32.5343 };
 const BORDER_EAST = { lon: -114.7196, lat: 32.7187 };
 
 /** South of the international border (land or Mexican coastal waters) and west of Arizona. */

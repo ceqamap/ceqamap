@@ -180,11 +180,7 @@ describe('resolveLocation', () => {
       ...B,
       counties: { ...B.counties, 'san diego': area('San Diego', rect(-117.6, 32.534, -116.08, 33.51)) },
     };
-    const r = resolveLocation(
-      '2011081008',
-      [doc({ coordinates: '32.5, -117.033333', counties: ['San Diego'] })],
-      b2,
-    )!;
+    const r = resolveLocation('2011081008', [doc({ coordinates: '32.5, -117.033333', counties: ['San Diego'] })], b2)!;
     assert.equal(r.precision, 'county');
     assert.equal(r.coordinatesRejected, true);
     // Offshore of San Diego (US waters) is still fine.
