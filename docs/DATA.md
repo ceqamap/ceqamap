@@ -42,6 +42,7 @@ Each project gets the best location available, in this order:
 | Exact         | Coordinates typed by the lead agency, if consistent with listed county | Solid dot           |
 | Address       | A street address in the project's text, geocoded by the Census         | Solid dot           |
 | Cross streets | Where the listed cross streets meet (Census road network)              | Dot, lighter center |
+| Street        | A seeded spot along the one listed street, inside the listed city      | Hollow ring         |
 | ZIP code      | A seeded random spot in the listed ZIP, inside the listed city/county  | Hollow ring         |
 | City          | A seeded random spot inside the listed city (Census outline)           | Hollow ring         |
 | County        | A seeded random spot inside the listed county (Census outline)         | Hollow ring         |
@@ -89,6 +90,11 @@ single city or ZIP to pair it with and are skipped.
 in the Census ZIP Code Tabulation Area (ZCTA), restricted to the part inside the listed city (or county), and only
 when the ZIP is smaller than the city. A ZIP that doesn't overlap the listed places is ignored (agencies sometimes
 type their own office's ZIP).
+
+**One listed street.** When Cross Streets names a single street ("Poway Road"), the project is placed at a seeded
+spot along the part of that street inside the listed city (or county, with no city), using the same Census roads. It
+is still marked approximate, and is skipped if that part of the street spreads over more than 15 km. Abbreviations
+inside names are expanded on both sides ("Med. Center Dr" = "Medical Center Dr", also Ctr, Cyn, Ft, Mtn, Hts...).
 
 Ways to improve this later:
 

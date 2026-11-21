@@ -5,7 +5,8 @@ import { formatNumber } from '../lib/format.ts';
 export function Legend({ meta, mode }: { meta: PublishedMeta | null; mode: 'light' | 'dark' }) {
   const [open, setOpen] = useState(() => window.innerWidth >= 720 && window.innerHeight >= 680);
   const approx = meta
-    ? (meta.counts.byPrecision.zip ?? 0) +
+    ? (meta.counts.byPrecision.street ?? 0) +
+      (meta.counts.byPrecision.zip ?? 0) +
       meta.counts.byPrecision.city +
       meta.counts.byPrecision.county +
       meta.counts.byPrecision.region

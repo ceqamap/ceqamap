@@ -91,6 +91,42 @@ const ALIASES: Record<string, string> = {
   'el camino': 'el camino real',
 };
 
+/**
+ * Abbreviated words inside street names, expanded the same way on both sides
+ * (CEQAnet text and Census names): "TELEGRAPH CANYON RD/MED. CENTER DR" ->
+ * "medical center dr". Not applied to the street type at the end.
+ */
+const WORD: Record<string, string> = {
+  med: 'medical',
+  ctr: 'center',
+  cntr: 'center',
+  mtn: 'mountain',
+  mtns: 'mountains',
+  ft: 'fort',
+  pt: 'point',
+  hts: 'heights',
+  spgs: 'springs',
+  spg: 'spring',
+  vly: 'valley',
+  cyn: 'canyon',
+  crk: 'creek',
+  lk: 'lake',
+  hosp: 'hospital',
+  univ: 'university',
+  pk: 'park',
+  arpt: 'airport',
+  ind: 'industrial',
+  jct: 'junction',
+  mdw: 'meadow',
+  mdws: 'meadows',
+  rch: 'ranch',
+  gdns: 'gardens',
+  gdn: 'garden',
+  hbr: 'harbor',
+  ests: 'estates',
+  cmty: 'community',
+};
+
 /** Suffix tokens dropped to make the "base" key (e.g. "olive mill"). */
 const DROPPABLE_SUFFIX = new Set([
   'rd',
@@ -158,6 +194,7 @@ export function streetKeys(name: string): StreetKeys | null {
     if (i === 0 && w === 'mt') return 'mount';
     if (i === 0 && DIRECTION[w] && t.length > 1) return DIRECTION[w];
     if (i === t.length - 1 && SUFFIX[w] && t.length > 1) return SUFFIX[w];
+    if (WORD[w] && t.length > 1) return WORD[w];
     return w;
   });
   const full = t.join(' ');
@@ -181,6 +218,25 @@ const FILLER =
  * when the text is vague ("Various", "N/A") or has fewer than two names.
  */
 export function parseCrossStreets(text: string | null | undefined): string[] {
+  const names = streetNames(text);
+  return names.length >= 2 ? names : [];
+}
+
+/**
+ * The one street named in a "Cross Streets" field that names exactly one
+ * ("Poway Road"), or null. Must look like a street: a street type or a
+ * numbered route, so "Project site" or "Downtown" don't qualify.
+ */
+export function parseSingleStreet(text: string | null | undefined): string | null {
+  const names = streetNames(text);
+  if (names.length !== 1) return null;
+  const k = streetKeys(names[0])!;
+  const last = k.full.split(' ').at(-1)!;
+  const typed = k.full !== k.base || /^(rte|i) \d+$/.test(k.full) || Object.values(SUFFIX).includes(last);
+  return typed ? names[0] : null;
+}
+
+function streetNames(text: string | null | undefined): string[] {
   if (!text) return [];
   const t = text
     .replace(/\(.*?\)/g, ' ')
@@ -201,5 +257,5 @@ export function parseCrossStreets(text: string | null | undefined): string[] {
     names.push(p);
     if (names.length === 4) break;
   }
-  return names.length >= 2 ? names : [];
+  return names;
 }

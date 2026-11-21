@@ -8,8 +8,9 @@
  * project asks about, which keeps memory small even for Los Angeles.
  */
 import type { Area } from './boundaries.ts';
-import { type BBox, distanceToShapeKm } from './geometry.ts';
+import { type BBox, distanceToShapeKm, inBBox, pointInShape } from './geometry.ts';
 import { haversineKm } from './location.ts';
+import { seededRandom } from './random.ts';
 import type { ShapefileFeature } from './shapefile.ts';
 import { streetKeys } from './streets.ts';
 
@@ -239,4 +240,78 @@ function match(
   if (sawAmbiguous) return { ok: false, reason: 'ambiguous' };
   if (sawOutside) return { ok: false, reason: 'outside-area' };
   return { ok: false, reason: sawCrossing ? 'outside-area' : 'no-crossing' };
+}
+
+/** A single listed street is only useful if it is short within the area. */
+export const MAX_STREET_SPREAD_KM = 15;
+
+export type StreetResult =
+  | { ok: true; lon: number; lat: number; lengthKm: number }
+  | { ok: false; reason: 'street-not-found' | 'outside-area' | 'too-long' };
+
+/**
+ * A seeded random spot along the one street a project lists, on the part of
+ * it inside the listed city (or, with no city, the listed county). Gives up
+ * when that part spreads over more than MAX_STREET_SPREAD_KM, where "along
+ * the street" would say little more than "in the county".
+ */
+export function placeAlongStreet(
+  index: RoadIndex,
+  name: string,
+  area: { city?: Area | null; county?: Area | null },
+  seed: string,
+): StreetResult {
+  const lines = linesFor(index, name, false) ?? linesFor(index, name, true);
+  if (!lines) return { ok: false, reason: 'street-not-found' };
+  const within = area.city ?? area.county;
+  const segs: { a: [number, number]; b: [number, number]; km: number }[] = [];
+  for (const l of lines) {
+    for (let i = 1; i < l.coords.length; i++) {
+      const p = l.coords[i - 1];
+      const q = l.coords[i];
+      // Long straight segments (rural roads) are cut into ~100 m pieces, so
+      // the part inside the area is kept even if the segment crosses its edge.
+      const km = haversineKm({ lon: p[0], lat: p[1] }, { lon: q[0], lat: q[1] });
+      const pieces = Math.max(1, Math.ceil(km / 0.1));
+      for (let k = 0; k < pieces; k++) {
+        const a: [number, number] = [p[0] + ((q[0] - p[0]) * k) / pieces, p[1] + ((q[1] - p[1]) * k) / pieces];
+        const b: [number, number] = [
+          p[0] + ((q[0] - p[0]) * (k + 1)) / pieces,
+          p[1] + ((q[1] - p[1]) * (k + 1)) / pieces,
+        ];
+        const mx = (a[0] + b[0]) / 2;
+        const my = (a[1] + b[1]) / 2;
+        if (within && !(inBBox(mx, my, within.bbox) && pointInShape(mx, my, within.shape))) continue;
+        segs.push({ a, b, km: km / pieces });
+      }
+    }
+  }
+  if (segs.length === 0) return { ok: false, reason: 'outside-area' };
+  let w = Infinity;
+  let s = Infinity;
+  let e = -Infinity;
+  let n = -Infinity;
+  for (const g of segs)
+    for (const [x, y] of [g.a, g.b]) {
+      w = Math.min(w, x);
+      e = Math.max(e, x);
+      s = Math.min(s, y);
+      n = Math.max(n, y);
+    }
+  if (haversineKm({ lon: w, lat: s }, { lon: e, lat: n }) > MAX_STREET_SPREAD_KM) return { ok: false, reason: 'too-long' };
+  const total = segs.reduce((t, g) => t + g.km, 0);
+  let pick = seededRandom(`${seed}:street`)() * total;
+  for (const g of segs) {
+    if (pick <= g.km || g === segs[segs.length - 1]) {
+      const t = g.km === 0 ? 0 : Math.min(1, pick / g.km);
+      return {
+        ok: true,
+        lon: g.a[0] + t * (g.b[0] - g.a[0]),
+        lat: g.a[1] + t * (g.b[1] - g.a[1]),
+        lengthKm: Math.round(total * 10) / 10,
+      };
+    }
+    pick -= g.km;
+  }
+  return { ok: false, reason: 'street-not-found' }; // unreachable
 }

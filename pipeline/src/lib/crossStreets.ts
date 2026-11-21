@@ -12,20 +12,25 @@
 import { type Area, type Boundaries, normalizePlaceName } from './boundaries.ts';
 import type { CeqaDocument } from './document.ts';
 import { pointInShape } from './geometry.ts';
-import { buildRoadIndex, findIntersection, type IntersectionResult } from './intersections.ts';
+import { buildRoadIndex, findIntersection, placeAlongStreet, type StreetResult } from './intersections.ts';
 import { log } from './log.ts';
-import { parseCrossStreets, streetKeys } from './streets.ts';
+import { parseCrossStreets, parseSingleStreet, streetKeys } from './streets.ts';
 import type { ShapefileFeature } from './shapefile.ts';
 
 export interface CrossStreetPlacement {
   lon: number;
   lat: number;
-  streets: [string, string];
+  /** Where two listed streets meet, or a spot along the one listed street. */
+  kind: 'intersection' | 'street';
+  /** The streets used: two for an intersection, one for a street. */
+  streets: string[];
 }
 
 export interface CrossStreetRequest {
   sch: string;
   names: string[];
+  /** Only one street is listed: place along it rather than at a crossing. */
+  single: boolean;
   city: Area | null;
   /** Normalized county keys to search, in order. */
   counties: string[];
@@ -40,8 +45,13 @@ export function crossStreetRequest(
 ): CrossStreetRequest | null {
   const withText = newestFirst.find((d) => d.crossStreets.trim());
   if (!withText) return null;
-  const names = parseCrossStreets(withText.crossStreets);
-  if (names.length < 2) return null;
+  let names = parseCrossStreets(withText.crossStreets);
+  const single = names.length < 2;
+  if (single) {
+    const one = parseSingleStreet(withText.crossStreets);
+    if (!one) return null;
+    names = [one];
+  }
   const placeDoc = newestFirst.find((d) => d.cities.length || d.counties.length) ?? withText;
   const cityKeys = placeDoc.cities.map(normalizePlaceName).filter((k) => b.places[k]);
   const city = cityKeys.length === 1 ? b.places[cityKeys[0]] : null;
@@ -51,7 +61,7 @@ export function crossStreetRequest(
     counties = Object.keys(b.counties).filter((k) => pointInShape(c.lon, c.lat, b.counties[k].shape));
   }
   if (counties.length === 0 || counties.length > 3) return null;
-  return { sch, names, city, counties };
+  return { sch, names, single, city, counties };
 }
 
 export interface CrossStreetStats {
@@ -68,7 +78,11 @@ export async function placeAtCrossStreets(
   b: Boundaries,
   loadRoads: (countyKey: string) => Promise<ShapefileFeature[] | null>,
 ): Promise<{ placements: Map<string, CrossStreetPlacement>; stats: CrossStreetStats }> {
-  const results = new Map<string, IntersectionResult>();
+  type Result =
+    | { ok: true; lon: number; lat: number; streets: string[] }
+    | { ok: false; reason: string }
+    | (StreetResult & { streets?: string[] });
+  const results = new Map<string, Result>();
   const byCounty = new Map<string, CrossStreetRequest[]>();
   for (const r of requests) {
     for (const c of r.counties) {
@@ -91,7 +105,10 @@ export async function placeAtCrossStreets(
     if (!roads) continue;
     const index = buildRoadIndex(roads, wanted);
     for (const r of pending) {
-      const res = findIntersection(index, r.names, { city: r.city, county: b.counties[county] });
+      const area = { city: r.city, county: b.counties[county] };
+      const res: Result = r.single
+        ? { ...placeAlongStreet(index, r.names[0], area, r.sch), streets: r.names }
+        : findIntersection(index, r.names, area);
       // Any success wins; otherwise keep the first county's reason.
       if (res.ok || !results.has(r.sch)) results.set(r.sch, res);
     }
@@ -101,9 +118,15 @@ export async function placeAtCrossStreets(
   const outcomes: Record<string, number> = {};
   for (const r of requests) {
     const res = results.get(r.sch);
-    const key = res ? (res.ok ? 'matched' : res.reason) : 'no-roads';
+    const key = (r.single ? 'street:' : '') + (res ? (res.ok ? 'matched' : res.reason) : 'no-roads');
     outcomes[key] = (outcomes[key] ?? 0) + 1;
-    if (res?.ok) placements.set(r.sch, { lon: res.lon, lat: res.lat, streets: res.streets });
+    if (res?.ok)
+      placements.set(r.sch, {
+        lon: res.lon,
+        lat: res.lat,
+        kind: r.single ? 'street' : 'intersection',
+        streets: res.streets ?? r.names,
+      });
   }
   log.info('Cross-street placement', { requests: requests.length, outcomes });
   return { placements, stats: { requests: requests.length, outcomes } };

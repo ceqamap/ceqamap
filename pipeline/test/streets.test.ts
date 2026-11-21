@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { toArea } from '../src/lib/boundaries.ts';
 import type { Ring } from '../src/lib/geometry.ts';
-import { buildRoadIndex, findIntersection } from '../src/lib/intersections.ts';
+import { buildRoadIndex, findIntersection, placeAlongStreet } from '../src/lib/intersections.ts';
 import type { ShapefileFeature } from '../src/lib/shapefile.ts';
-import { parseCrossStreets, streetKeys } from '../src/lib/streets.ts';
+import { parseCrossStreets, parseSingleStreet, streetKeys } from '../src/lib/streets.ts';
 
 describe('streetKeys', () => {
   const same = (a: string, b: string) => assert.equal(streetKeys(a)?.full, streetKeys(b)?.full, `${a} vs ${b}`);
@@ -174,5 +174,69 @@ describe('findIntersection', () => {
       ok: false,
       reason: 'outside-area',
     });
+  });
+});
+
+describe('abbreviations inside street names', () => {
+  it('expands Med., Ctr., Cyn. and friends (SCH 1996081047)', () => {
+    assert.equal(streetKeys('MED. CENTER DR')?.full, streetKeys('Medical Center Dr')?.full);
+    assert.equal(streetKeys('Medical Ctr Dr')?.full, 'medical center dr');
+    assert.equal(streetKeys('Telegraph Cyn Rd')?.full, 'telegraph canyon rd');
+    assert.equal(streetKeys('Ft Bragg Rd')?.full, 'fort bragg rd');
+    // A street type at the end is still a street type.
+    assert.equal(streetKeys('Mission Ct')?.full, 'mission ct');
+  });
+});
+
+describe('parseSingleStreet', () => {
+  it('accepts one named street', () => {
+    assert.equal(parseSingleStreet('Poway Road'), 'Poway Road');
+    assert.equal(parseSingleStreet('Highway 99'), 'Highway 99');
+    assert.equal(parseSingleStreet('along Main St'), 'Main St');
+  });
+  it('rejects two streets, vague text and non-streets', () => {
+    assert.equal(parseSingleStreet('Olive Mill Rd. and Hot Springs Road'), null);
+    assert.equal(parseSingleStreet('Various'), null);
+    assert.equal(parseSingleStreet('Project site'), null);
+    assert.equal(parseSingleStreet('Downtown'), null);
+  });
+});
+
+describe('placeAlongStreet', () => {
+  const line = (name: string, ...coords: [number, number][]): ShapefileFeature => ({
+    properties: { FULLNAME: name },
+    shape: [coords],
+  });
+  const sq = (w: number, s: number, e: number, n: number): Ring => [
+    [w, s],
+    [e, s],
+    [e, n],
+    [w, n],
+    [w, s],
+  ];
+  const city = toArea('Poway', [sq(-117.1, 32.9, -116.95, 33.05)])!;
+  const idx = buildRoadIndex(
+    [
+      line('Poway Rd', [-117.2, 32.95], [-117.0, 32.96], [-116.9, 32.97]),
+      line('Long Rd', [-118.5, 34.0], [-116.5, 33.0]),
+    ],
+    new Set(['poway rd', 'poway', 'long rd', 'long']),
+  );
+
+  it('places on the part of the street inside the listed area, the same spot every time', () => {
+    const a = placeAlongStreet(idx, 'Poway Road', { city }, '2011081008');
+    const b = placeAlongStreet(idx, 'Poway Road', { city }, '2011081008');
+    assert.ok(a.ok);
+    assert.deepEqual(a, b);
+    if (a.ok) {
+      assert.ok(a.lon >= -117.1 && a.lon <= -116.95, `lon ${a.lon}`);
+      assert.ok(Math.abs(a.lat - 32.955) < 0.02);
+    }
+  });
+
+  it('gives up on streets that are missing, elsewhere, or too long', () => {
+    assert.deepEqual(placeAlongStreet(idx, 'Nope St', { city }, 'x'), { ok: false, reason: 'street-not-found' });
+    assert.deepEqual(placeAlongStreet(idx, 'Long Rd', { city }, 'x'), { ok: false, reason: 'outside-area' });
+    assert.deepEqual(placeAlongStreet(idx, 'Long Rd', {}, 'x'), { ok: false, reason: 'too-long' });
   });
 });
