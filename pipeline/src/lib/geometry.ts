@@ -69,6 +69,13 @@ export function distanceToShapeKm(lon: number, lat: number, shape: Shape): numbe
   return best;
 }
 
+/** Signed area of one ring in square degrees (sign = winding direction). */
+export function signedRingArea(ring: Ring): number {
+  let a = 0;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) a += ring[j][0] * ring[i][1] - ring[i][0] * ring[j][1];
+  return a / 2;
+}
+
 /**
  * Net area in km², from the shoelace formula. Holes subtract because shapefiles
  * wind them opposite to their outer rings.

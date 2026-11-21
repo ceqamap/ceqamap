@@ -211,6 +211,33 @@ describe('resolveLocation', () => {
     }
   });
 
+  it('keeps county-level points on the mainland, off islands like Santa Cruz Island', () => {
+    // Mainland 1.0 x 0.5 degrees; island 0.2 x 0.1 (4% of mainland) offshore.
+    const sb = area('Santa Barbara', rect(-120.5, 34.4, -119.5, 34.9), rect(-119.9, 33.9, -119.7, 34.0));
+    const b2: Boundaries = { ...B, counties: { ...B.counties, 'santa barbara': sb } };
+    for (let i = 0; i < 300; i++) {
+      const r = resolveLocation(`1999${String(i).padStart(6, '0')}`, [doc({ counties: ['Santa Barbara'] })], b2)!;
+      assert.ok(r.lat >= 34.4, `placed on the island at ${r.lat}`);
+    }
+  });
+
+  it('keeps points out of holes (unincorporated enclaves)', () => {
+    // Outer square with a hole wound the opposite way, as shapefiles do.
+    const hole: Ring = [
+      [-118.4, 34.0],
+      [-118.4, 34.1],
+      [-118.3, 34.1],
+      [-118.3, 34.0],
+      [-118.4, 34.0],
+    ];
+    const city = area('Holey', rect(-118.5, 33.9, -118.2, 34.2), hole);
+    const b2: Boundaries = { ...B, places: { ...B.places, holey: city } };
+    for (let i = 0; i < 300; i++) {
+      const r = resolveLocation(`2020${String(i).padStart(6, '0')}`, [doc({ cities: ['Holey'] })], b2)!;
+      assert.ok(!(r.lon > -118.4 && r.lon < -118.3 && r.lat > 34.0 && r.lat < 34.1), 'placed inside the hole');
+    }
+  });
+
   it('spreads consecutive SCH numbers apart instead of along a curve', () => {
     const pts = Array.from({ length: 300 }, (_, i) =>
       resolveLocation(`2026${String(i).padStart(6, '0')}`, [doc({ cities: ['Los Angeles'] })], B)!,

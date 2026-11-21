@@ -2,7 +2,7 @@ import type { LocationPrecision } from '../../../packages/shared/src/index.ts';
 import { type Area, type Boundaries, normalizePlaceName } from './boundaries.ts';
 import { parseCoordinates } from './coordinates.ts';
 import type { CeqaDocument } from './document.ts';
-import { areaKm2, bboxOf, distanceToShapeKm, inBBox, pointInShape, samplePointInShape } from './geometry.ts';
+import { bboxOf, distanceToShapeKm, inBBox, pointInShape, samplePointInShape, signedRingArea } from './geometry.ts';
 import { seededRandom } from './random.ts';
 
 /**
@@ -22,8 +22,9 @@ import { seededRandom } from './random.ts';
  * "Random" is seeded by the SCH number, so a project lands in the same spot
  * on every rebuild, and spots are drawn inside the real Census outline, which
  * is clipped to the shoreline, so approximate points never land in the ocean.
- * Small outlying islands (under 2% of a place's area, e.g. the Farallones in
- * San Francisco) are skipped when placing approximate points.
+ * Outlying islands (any piece under 10% of a place's largest piece: the
+ * Farallones, Catalina, the Channel Islands) are skipped when placing
+ * approximate points; projects there almost always give coordinates.
  */
 
 export interface ResolvedLocation {
@@ -38,8 +39,8 @@ export interface ResolvedLocation {
 export const COORDINATE_TOLERANCE_KM = 5;
 /** Projects often sit just outside the city they list (unincorporated edges). */
 export const CITY_TOLERANCE_KM = 10;
-/** Islands smaller than this share of a place's area don't receive approximate points. */
-const MIN_RING_SHARE = 0.02;
+/** Pieces smaller than this share of a place's largest piece don't receive approximate points. */
+const MIN_PIECE_SHARE = 0.1;
 /** With no county to check against: allow state waters and nearshore work. */
 const STATE_TOLERANCE_KM = 25;
 const MAX_CITY_SPREAD_KM = 40;
@@ -83,11 +84,20 @@ function nearAny(lon: number, lat: number, areas: Area[], toleranceKm: number): 
 
 const samplingCache = new WeakMap<Area, Area>();
 
-/** The area without small outlying rings, for placing approximate points. */
+/**
+ * The area without outlying islands, for placing approximate points. Holes
+ * (wound opposite to the largest ring) are kept, so points stay out of
+ * enclaves; outer pieces under 10% of the largest piece are dropped.
+ */
 function samplingArea(a: Area): Area {
   let s = samplingCache.get(a);
   if (!s) {
-    const rings = a.shape.filter((ring) => areaKm2([ring]) >= a.areaKm2 * MIN_RING_SHARE);
+    const signed = a.shape.map(signedRingArea);
+    const largest = signed.reduce((m, x, i) => (Math.abs(x) > Math.abs(signed[m]) ? i : m), 0);
+    const outerSign = Math.sign(signed[largest]);
+    const rings = a.shape.filter(
+      (_, i) => Math.sign(signed[i]) !== outerSign || Math.abs(signed[i]) >= Math.abs(signed[largest]) * MIN_PIECE_SHARE,
+    );
     const shape = rings.length > 0 ? rings : a.shape;
     s = { ...a, shape, bbox: bboxOf(shape) };
     samplingCache.set(a, s);
