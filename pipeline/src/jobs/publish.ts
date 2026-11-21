@@ -8,6 +8,9 @@
  *   3. meta.json is written LAST. Until then, every client keeps using the
  *      previous, complete build.
  *   4. Old tilesets are pruned, keeping a few for clients mid-session.
+ *
+ * PUBLISH_PREFIX=preview-data publishes a pull request's build alongside the
+ * live data for review on preview.ceqamap.org, without touching production.
  */
 import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
@@ -17,12 +20,15 @@ import { log } from '../lib/log.ts';
 import { mapLimit, storageFromEnv } from '../lib/storage.ts';
 
 const OUT = new URL('../../out/', import.meta.url).pathname;
-const MANIFEST = 'state/manifest.json';
+const PREFIX = (process.env.PUBLISH_PREFIX ?? 'data').replace(/^\/+|\/+$/g, '');
+if (!/^[a-z0-9-]+$/.test(PREFIX)) throw new Error(`Invalid PUBLISH_PREFIX "${PREFIX}"`);
+const MANIFEST = PREFIX === 'data' ? 'state/manifest.json' : `state/manifest-${PREFIX}.json`;
 const KEEP_TILESETS = 3;
 const storage = storageFromEnv();
 
 const meta = JSON.parse(await readFile(join(OUT, 'meta.json'), 'utf8')) as PublishedMeta;
-const tilesKey = `data/tiles/projects-${meta.buildId}.pmtiles`;
+const tilesKey = `${PREFIX}/tiles/projects-${meta.buildId}.pmtiles`;
+meta.ref = process.env.GITHUB_REF_NAME ?? undefined;
 
 // 1. Tiles.
 await storage.put(tilesKey, await readFile(join(OUT, 'projects.pmtiles')), {
@@ -45,26 +51,26 @@ for (const file of await readdir(join(OUT, 'projects'))) {
   if (prev[sch] !== hash) toUpload.push(sch);
 }
 await mapLimit(toUpload, 48, async (sch) => {
-  await storage.put(`data/projects/${sch}.json`, await readFile(join(OUT, 'projects', `${sch}.json`)), {
+  await storage.put(`${PREFIX}/projects/${sch}.json`, await readFile(join(OUT, 'projects', `${sch}.json`)), {
     contentType: 'application/json; charset=utf-8',
     cacheControl: 'public, max-age=300, stale-while-revalidate=86400',
   });
 });
 const removed = Object.keys(prev).filter((sch) => !(sch in next));
-await mapLimit(removed, 48, (sch) => storage.delete(`data/projects/${sch}.json`));
+await mapLimit(removed, 48, (sch) => storage.delete(`${PREFIX}/projects/${sch}.json`));
 await storage.put(MANIFEST, JSON.stringify(next), { contentType: 'application/json' });
 log.info('Uploaded projects', { changed: toUpload.length, removed: removed.length, total: Object.keys(next).length });
 
 // 3. Flip clients to the new build.
-meta.tiles = tilesKey.replace(/^data\//, '');
-await storage.put('data/meta.json', JSON.stringify(meta), {
+meta.tiles = tilesKey.slice(PREFIX.length + 1);
+await storage.put(`${PREFIX}/meta.json`, JSON.stringify(meta), {
   contentType: 'application/json; charset=utf-8',
   cacheControl: 'public, max-age=60, must-revalidate',
 });
-log.info('Published meta', { buildId: meta.buildId });
+log.info('Published meta', { buildId: meta.buildId, prefix: PREFIX, ref: meta.ref });
 
 // 4. Prune.
-const tilesets = (await storage.list('data/tiles/')).filter((k) => k.endsWith('.pmtiles')).sort();
+const tilesets = (await storage.list(`${PREFIX}/tiles/`)).filter((k) => k.endsWith('.pmtiles')).sort();
 for (const old of tilesets.slice(0, Math.max(0, tilesets.length - KEEP_TILESETS))) {
   if (old !== tilesKey) await storage.delete(old);
 }

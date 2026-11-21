@@ -52,7 +52,7 @@ cp .env.example .env               # then put your email in CEQANET_CONTACT
 
 # Pull a few recent months of real data into ./.data (takes about a minute)
 set -a; . ./.env; set +a
-pnpm --filter @ceqa-atlas/pipeline gazetteer      # once; writes pipeline/data/gazetteer.json
+pnpm --filter @ceqa-atlas/pipeline boundaries     # once; writes pipeline/data/boundaries.json
 pnpm --filter @ceqa-atlas/pipeline backfill --from 2026-08
 pnpm --filter @ceqa-atlas/pipeline build-data
 pnpm --filter @ceqa-atlas/pipeline publish-data   # with no R2 settings, "publishes" into ./.data
@@ -98,6 +98,12 @@ Every change goes through a pull request:
    links there. The preview shows whichever pull request was updated most recently.
 3. Review the preview in the browser. Request changes on the pull request, or approve it.
 4. Merging into `main` publishes it to **https://ceqamap.org** about two minutes later.
+
+Changes to how data is processed (in `pipeline/`) need their data rebuilt to be reviewable: run **Actions → Data
+refresh → Run workflow**, pick the pull request's branch and target `preview`. That builds from the stored CEQAnet
+history (nothing is fetched or changed) into `preview-data/`, and the preview site uses it automatically. Expect
+about 30–45 minutes the first time. After merging, run the same workflow on `main` with `force_build` to publish
+the new data to production.
 
 ## When something breaks
 
