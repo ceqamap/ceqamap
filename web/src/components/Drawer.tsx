@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { PRECISION_LABEL, type PublishedProject, STATUS_BY_ID } from '../../../packages/shared/src/index.ts';
+import { type LocationPrecision, PRECISION_LABEL, type PublishedProject, STATUS_BY_ID } from '../../../packages/shared/src/index.ts';
 import { fetchProject } from '../lib/data.ts';
 import { formatDate, formatNumber, placeLine, reviewCountdown, splitFacts, todayInCalifornia } from '../lib/format.ts';
 
@@ -17,6 +17,16 @@ type State =
   | { kind: 'ready'; project: PublishedProject };
 
 const DESCRIPTION_PREVIEW = 420;
+
+const FALLBACK_PHRASE: Record<LocationPrecision, string> = {
+  exact: 'at its coordinates',
+  address: 'at the street address in its description',
+  intersection: 'near its listed cross streets',
+  zip: 'within its listed ZIP code',
+  city: 'within its listed city',
+  county: 'within its listed county',
+  region: 'between its listed counties',
+};
 
 export function Drawer({ sch, mode, onClose, onLoaded }: Props) {
   const [state, setState] = useState<State>({ kind: 'idle' });
@@ -140,14 +150,16 @@ function ProjectDetail({
               {' · '}
               {PRECISION_LABEL[p.location.precision]}
               {p.location.streets && ` (${p.location.streets[0]} and ${p.location.streets[1]})`}
+              {p.location.address && ` (${p.location.address})`}
+              {p.location.precision === 'zip' && p.location.zip && ` (${p.location.zip})`}
             </span>
           )}
         </p>
       )}
       {p.location?.coordinatesRejected && (
         <p className="drawer-note muted">
-          The coordinates filed with CEQAnet don’t match the city or county listed for this project, so it is placed
-          within its listed {p.location.precision === 'city' ? 'city' : 'county'} instead.
+          The coordinates filed with CEQAnet don’t match the city or county listed for this project, so it is placed{' '}
+          {FALLBACK_PHRASE[p.location.precision]} instead.
         </p>
       )}
 

@@ -40,7 +40,9 @@ Each project gets the best location available, in this order:
 | Precision     | Source                                                                 | On the map          |
 | ------------- | ---------------------------------------------------------------------- | ------------------- |
 | Exact         | Coordinates typed by the lead agency, if consistent with listed county | Solid dot           |
+| Address       | A street address in the project's text, geocoded by the Census         | Solid dot           |
 | Cross streets | Where the listed cross streets meet (Census road network)              | Dot, lighter center |
+| ZIP code      | A seeded random spot in the listed ZIP, inside the listed city/county  | Hollow ring         |
 | City          | A seeded random spot inside the listed city (Census outline)           | Hollow ring         |
 | County        | A seeded random spot inside the listed county (Census outline)         | Hollow ring         |
 | Region        | Inside one of 2–3 neighboring listed counties                          | Hollow ring         |
@@ -70,9 +72,24 @@ so overpasses count; if the same pair of names crosses in several far-apart plac
 dataset (2026‑11‑20): **33,281 placed (57.6%)**, 26.7% name a street the Census data doesn't have (typos, nicknames,
 old names), 13.3% name streets that don't meet. The rest are ambiguous or too far from the listed city.
 
+**Street addresses.** CEQAnet has no address field, but about 23,600 approximate projects write one in Cross
+Streets (8,600), the project title (6,200) or the description (8,700), e.g. "1450 Expo Parkway". `address.ts` pulls out
+the first house number + street name + street type (strictly: highways, acreages and lot counts don't count), and
+`geocode.ts` sends it with the listed city or ZIP to the free Census batch geocoder. A result is kept only if it
+agrees with the listed places (as for agency coordinates). Results, including misses, are cached in
+`state/geocode-cache.json`, so each address is geocoded once; misses are retried after six months. On a 3,000-project
+sample (2026‑11‑20): 77% placed, 22% not found by the Census, 1% rejected for contradicting the listed places (usually
+a wrong city, e.g. a Sacramento address on a project listed in Los Angeles). About 3,800 have an address but no
+single city or ZIP to pair it with and are skipped.
+
+**ZIP codes.** About 46,000 approximate projects list a valid California ZIP. They are placed at a seeded random spot
+in the Census ZIP Code Tabulation Area (ZCTA), restricted to the part inside the listed city (or county), and only
+when the ZIP is smaller than the city. A ZIP that doesn't overlap the listed places is ignored (agencies sometimes
+type their own office's ZIP).
+
 Ways to improve this later:
 
-1. A commercial geocoder (e.g. Geocodio) for the ~24,000 unmatched cross streets, and **ZIP code** areas.
+1. A commercial geocoder (e.g. Geocodio) for the ~24,000 unmatched cross streets and the addresses the Census misses.
 2. Match **parcel numbers** (APNs) against county parcel layers. Most precise, most work (58 counties, 58 formats).
 
 ## Status: inferred, not reported

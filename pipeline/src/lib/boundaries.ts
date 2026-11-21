@@ -23,8 +23,11 @@ export interface Area {
 
 export interface Boundaries {
   vintage?: string;
+  zipVintage?: string;
   places: Record<string, Area>;
   counties: Record<string, Area>;
+  /** California ZIP Code Tabulation Areas, keyed by 5-digit ZIP. */
+  zips?: Record<string, Area>;
 }
 
 /**
@@ -86,4 +89,16 @@ export function buildBoundaries(
     places: index(places, (f) => f.properties.LSAD === '57'), // 57 = CDP
     counties: index(counties, () => false),
   };
+}
+
+/** California ZCTAs (ZIP codes 90000-96199) from the Census ZCTA file. */
+export function buildZips(features: ShapefileFeature[]): Record<string, Area> {
+  const out: Record<string, Area> = {};
+  for (const f of features) {
+    const zip = f.properties.ZCTA5CE20 ?? f.properties.ZCTA5CE10 ?? f.properties.GEOID20 ?? '';
+    if (!/^9[0-6]\d{3}$/.test(zip) || !f.shape) continue;
+    const area = toArea(zip, f.shape);
+    if (area) out[zip] = area;
+  }
+  return out;
 }

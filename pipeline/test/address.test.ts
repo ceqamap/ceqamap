@@ -11,6 +11,10 @@ describe('extractAddress', () => {
     assert.equal(street('Lot split at 55 W. 3rd Ave., Escondido'), '55 W. 3rd Ave');
     assert.equal(street('22500 Pacific Coast Highway Residence'), '22500 Pacific Coast Highway');
     assert.equal(street('Demolition at 410 Via Colinas'), '410 Via Colinas');
+    assert.equal(street('5990 West Camino De La Costa, San Diego CA'), '5990 West Camino De La Costa');
+    assert.equal(street('Location: 3337 County Road 307, Elk Creek'), '3337 County Road 307');
+    assert.equal(street('511 West Avenue 49 (ENV-2026-648-CE)'), '511 West Avenue 49');
+    assert.equal(street('ENV-2013-2239-MND / 15275 W. De Pauw Street'), '15275 W. De Pauw Street');
   });
 
   it('ignores highways, quantities and years', () => {
@@ -22,6 +26,13 @@ describe('extractAddress', () => {
     assert.equal(street('2040 General Plan Update'), null);
     assert.equal(street('$1,500 Main St'), null);
     assert.equal(street('1 State Route 1'), null);
+    assert.equal(street('SR-99 Washington Avenue Water Crossing'), null);
+    assert.equal(street('PROPOSED DIVISION 6 JEFFERSON BLVD RELOCATION'), null);
+    assert.equal(street('pursuant to Section 2019 by Industrial Court'), null);
+    assert.equal(street('addition of 700 square foot terrace'), null);
+    assert.equal(street('a 12 foot wide access road'), null);
+    assert.equal(street('South of Avenue 38 along Madison Street'), null);
+    assert.equal(street('4500 maximum pounds per square'), null);
   });
 });
 
