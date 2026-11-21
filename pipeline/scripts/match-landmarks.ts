@@ -17,7 +17,7 @@ import { storageFromEnv } from '../src/lib/storage.ts';
 
 const SAMPLE = Number(process.env.SAMPLE ?? 80);
 /** Projects to explain in detail (mentions found and their GNIS entries). */
-const EXPLAIN = new Set((process.env.EXPLAIN ?? '2026110686').split(','));
+const EXPLAIN = new Set((process.env.EXPLAIN ?? '').split(','));
 const storage = storageFromEnv();
 const boundaries = JSON.parse(
   await readFile(new URL('../data/boundaries.json', import.meta.url), 'utf8'),
