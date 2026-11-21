@@ -1,9 +1,17 @@
-import { STATUS_BY_ID } from '../../../packages/shared/src/index.ts';
-import { formatNumber } from '../lib/format.ts';
+import { type PublishedArrivals, STATUS_BY_ID } from '../../../packages/shared/src/index.ts';
+import { formatNumber, timeAgo } from '../lib/format.ts';
 import type { HoverInfo } from '../map/MapView.tsx';
 
 /** Follows the cursor; flips to stay on screen. Not rendered on touch devices. */
-export function HoverCard({ info, mode }: { info: HoverInfo | null; mode: 'light' | 'dark' }) {
+export function HoverCard({
+  info,
+  mode,
+  arrivals,
+}: {
+  info: HoverInfo | null;
+  mode: 'light' | 'dark';
+  arrivals: PublishedArrivals | undefined;
+}) {
   if (!info) return null;
   const flipX = info.x > window.innerWidth - 340;
   const flipY = info.y > window.innerHeight - 140;
@@ -27,9 +35,17 @@ export function HoverCard({ info, mode }: { info: HoverInfo | null; mode: 'light
             'Click to zoom in'
           )}
         </p>
+        {info.arrived > 0 && (
+          <p className="hover-meta hover-new">
+            <span className="new-ring" aria-hidden="true" />
+            {formatNumber(info.arrived)} just arrived
+          </p>
+        )}
       </div>
     );
   }
+
+  const arrival = info.props.n ? arrivals?.items.find((i) => i.id === info.props.id) : undefined;
 
   const status = STATUS_BY_ID[info.props.s] ?? STATUS_BY_ID.other;
   return (
@@ -44,6 +60,12 @@ export function HoverCard({ info, mode }: { info: HoverInfo | null; mode: 'light
         {status.label}
         {info.props.x === 0 ? ' · approximate location' : info.props.x === 2 ? ' · near the listed cross streets' : ''}
       </p>
+      {arrival && arrivals && (
+        <p className="hover-meta hover-new">
+          <span className="new-ring" aria-hidden="true" />
+          {arrival.kind === 'project' ? 'New project' : `New filing: ${arrival.typeLabel}`} · {timeAgo(arrivals.at)}
+        </p>
+      )}
     </div>
   );
 }

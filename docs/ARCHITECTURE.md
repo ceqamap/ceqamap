@@ -24,10 +24,14 @@
 1. **Ingest** (`pipeline/src/jobs/ingest.ts`): fetch the last 21 days of CEQAnet CSV, repair and validate it, and
    merge it into monthly partitions in R2 (`state/docs/YYYY-MM.ndjson.gz`). Raw CSV is archived beside it so we can
    reprocess history without refetching.
+   Documents seen for the first time are saved as the latest batch of arrivals (`state/arrivals.json`); runs with
+   nothing new leave the previous batch in place.
 2. **Build** (`build.ts`): read all partitions, group documents into projects, derive stage and location, and write
-   per‑project JSON plus a point file that tippecanoe turns into `projects.pmtiles`.
-3. **Publish** (`publish.ts`): upload the tileset under a new immutable name, upload only project files whose content
-   changed, then write `meta.json` last. Clients switch to the new build only once it is complete.
+   per‑project JSON plus one point file per time window (30 days, 12 months, 5 years, all time) that tippecanoe turns
+   into clustered tilesets. Clusters sum per‑stage counts so the legend's stage filter needs no extra tiles.
+3. **Publish** (`publish.ts`): upload the tilesets under new immutable names
+   (`tiles/projects-<buildId>-<window>.pmtiles`), upload only project files whose content changed, then write
+   `meta.json` last. Clients switch to the new build only once it is complete.
 
 ## The web app
 

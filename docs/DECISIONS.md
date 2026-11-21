@@ -26,8 +26,8 @@
 
 ## Deliberately deferred
 
-- Filters and search (per your direction). The data model already carries stage, dates, agency, development type,
-  and issues, so these are a UI addition, not a rebuild.
+- Search and further filters (project size, development type, lead agency). The time window and stage filters
+  shipped on 2026-11-21 (see DESIGN.md); the data model already carries the rest.
 - The client's alerting use case (notify on new projects matching criteria). The same pipeline can do it: after
   each ingest, match new filings against saved criteria and send email.
 - 3D terrain, self‑hosted basemap tiles, and boundary‑aware scattering (see DATA.md).
