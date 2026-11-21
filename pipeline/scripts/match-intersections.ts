@@ -108,10 +108,24 @@ async function countyRoads(fips: string) {
   const dir = join(TIGER_DIR, name);
   if (!existsSync(join(dir, `${name}.shp`))) {
     await mkdir(dir, { recursive: true });
-    const res = await fetch(`https://www2.census.gov/geo/tiger/TIGER${TIGER_VINTAGE}/ROADS/${name}.zip`);
-    if (!res.ok) throw new Error(`Download failed for ${name}: ${res.status}`);
-    await writeFile(join(dir, `${name}.zip`), new Uint8Array(await res.arrayBuffer()));
-    execFileSync('unzip', ['-o', '-q', join(dir, `${name}.zip`), '-d', dir]);
+    const zip = join(dir, `${name}.zip`);
+    // census.gov occasionally cuts a download short; verify the zip and retry.
+    for (let attempt = 1; ; attempt++) {
+      const res = await fetch(`https://www2.census.gov/geo/tiger/TIGER${TIGER_VINTAGE}/ROADS/${name}.zip`);
+      if (res.ok) {
+        await writeFile(zip, new Uint8Array(await res.arrayBuffer()));
+        try {
+          execFileSync('unzip', ['-t', '-q', zip], { stdio: 'pipe' });
+          break;
+        } catch {
+          // fall through to retry
+        }
+      }
+      if (attempt >= 5) throw new Error(`Download failed for ${name} after ${attempt} attempts (last status ${res.status})`);
+      console.log(`Retrying ${name} (attempt ${attempt} failed)`);
+      await new Promise((r) => setTimeout(r, attempt * 5000));
+    }
+    execFileSync('unzip', ['-o', '-q', zip, '-d', dir]);
   }
   return readShapefile(
     new Uint8Array(await readFile(join(dir, `${name}.shp`))),
