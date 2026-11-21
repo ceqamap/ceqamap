@@ -99,6 +99,10 @@ export function paperify(style: StyleSpecification, palette: 'paper' | 'night'):
         paint['fill-color'] = color;
         delete paint['fill-pattern'];
         delete paint['fill-outline-color'];
+        // OpenFreeMap Dark draws woods and residential areas at 40% opacity,
+        // which on a near-black map leaves parks indistinguishable. Night
+        // uses its own solid colors instead.
+        if (palette === 'night' && (role === 'green' || role === 'landuse')) paint['fill-opacity'] = 1;
         break;
       case 'line':
         paint['line-color'] = color;
