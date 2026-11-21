@@ -953,6 +953,15 @@ a {
   background-position: center;
   background-repeat: no-repeat; /* the 24px icon tiled at the edges of the larger button */
 }
+/* MapLibre draws a blue glow on :focus, so it shows after every mouse click.
+   Keep only the site's own focus ring, which browsers show for keyboard focus. */
+.maplibregl-ctrl-attrib .maplibregl-ctrl-attrib-button:focus {
+  box-shadow: none;
+}
+.maplibregl-ctrl-attrib .maplibregl-ctrl-attrib-button:focus-visible {
+  outline: 2px solid var(--signal-ink);
+  outline-offset: 2px;
+}
 .maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-button:hover {
   background-color: var(--paper);
 }
