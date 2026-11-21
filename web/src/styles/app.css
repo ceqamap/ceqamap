@@ -281,10 +281,12 @@ a {
   flex-direction: column;
   align-items: flex-end;
   gap: 10px;
-  transition: right 0.35s var(--ease);
+  /* Moves with the drawer: same distance, duration and easing (see .drawer). */
+  transition: transform var(--drawer-out);
 }
 .drawer-open .controls {
-  right: calc(var(--drawer-width) + var(--gutter) * 2);
+  transform: translateX(calc(-1 * (var(--drawer-width) + var(--gutter))));
+  transition: transform var(--drawer-in);
 }
 
 .pill {
@@ -426,7 +428,7 @@ a {
 .legend {
   position: absolute;
   left: var(--gutter);
-  bottom: calc(var(--gutter) + 18px);
+  bottom: var(--gutter); /* level with the project drawer's bottom edge */
   z-index: 2;
   width: 264px;
   /* Same 2px inset as the zoom controls, so the header button lines up with them. */
@@ -631,12 +633,20 @@ a {
   background: var(--card);
   backdrop-filter: none;
   transform: translateX(calc(100% + var(--gutter) * 2));
-  transition: transform 0.4s var(--ease);
+  /* Closing: a quicker ease-in, then hide (visibility waits for the slide, so
+     it no longer vanishes before moving). Opening: a longer ease-out. */
+  transition:
+    transform var(--drawer-out),
+    visibility 0s linear var(--drawer-out-ms);
   visibility: hidden;
+  will-change: transform;
 }
 .drawer.open {
   transform: none;
   visibility: visible;
+  transition:
+    transform var(--drawer-in),
+    visibility 0s;
 }
 
 .drawer-bar {
@@ -946,7 +956,7 @@ a {
     bottom: calc(var(--gutter) + 24px);
   }
   .drawer-open .controls {
-    right: var(--gutter);
+    transform: none; /* the drawer is a bottom sheet here */
   }
   /* Drawer becomes a bottom sheet. */
   .drawer {

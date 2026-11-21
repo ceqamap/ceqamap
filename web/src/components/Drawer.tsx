@@ -50,8 +50,12 @@ export function Drawer({ sch, mode, onClose, onLoaded }: Props) {
   const onLoadedRef = useRef(onLoaded);
   onLoadedRef.current = onLoaded;
 
+  // Keep showing the last project while the drawer slides closed, instead of
+  // emptying it first.
+  const [shownSch, setShownSch] = useState(sch);
   useEffect(() => {
-    if (!sch) return setState({ kind: 'idle' });
+    if (!sch) return;
+    setShownSch(sch);
     let live = true;
     setState({ kind: 'loading' });
     fetchProject(sch).then(
@@ -83,13 +87,14 @@ export function Drawer({ sch, mode, onClose, onLoaded }: Props) {
     <aside
       className={`drawer card ${open ? 'open' : ''}`}
       aria-hidden={!open}
+      inert={!open}
       aria-labelledby="drawer-title"
       role="dialog"
     >
-      {open && (
+      {shownSch && (
         <>
           <div className="drawer-bar">
-            <span className="eyebrow">SCH {sch}</span>
+            <span className="eyebrow">SCH {shownSch}</span>
             <button className="icon-button" onClick={onClose} aria-label="Close project details">
               ✕
             </button>

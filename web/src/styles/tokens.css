@@ -31,4 +31,8 @@
   --shadow-card: 0 1px 0 rgba(21, 21, 21, 0.04), 0 12px 32px -12px rgba(21, 21, 21, 0.18);
   --gutter: clamp(12px, 2.2vw, 24px);
   --drawer-width: min(460px, 100vw);
+  /* Drawer motion, shared by the drawer and the map controls that move with it. */
+  --drawer-in: 460ms cubic-bezier(0.16, 1, 0.3, 1);
+  --drawer-out-ms: 280ms;
+  --drawer-out: 280ms cubic-bezier(0.4, 0, 0.9, 0.6);
 }
