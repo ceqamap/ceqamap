@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   type LocationPrecision,
   PRECISION_LABEL,
@@ -133,12 +133,8 @@ function ProjectDetail({
   project: PublishedProject;
   headingRef: React.RefObject<HTMLHeadingElement | null>;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const today = todayInCalifornia();
-  const longDescription = p.description.length > DESCRIPTION_PREVIEW;
-  const description =
-    longDescription && !expanded ? `${p.description.slice(0, DESCRIPTION_PREVIEW).trimEnd()}…` : p.description;
   const place = p.location ? placeLine(p.location.cities, p.location.counties) : '';
 
   const facts: [string, string][] = [];
@@ -192,14 +188,9 @@ function ProjectDetail({
         </p>
       )}
 
-      {description && (
+      {p.description && (
         <section className="drawer-section">
-          <p className="drawer-description">{description}</p>
-          {longDescription && (
-            <button className="text-button" onClick={() => setExpanded((e) => !e)}>
-              {expanded ? 'Show less' : 'Read full description'}
-            </button>
-          )}
+          <Description key={p.sch} text={p.description} />
         </section>
       )}
 
@@ -303,5 +294,88 @@ function DrawerSkeleton() {
       <span style={{ width: '50%' }} />
       <span style={{ width: '100%', height: 96 }} />
     </div>
+  );
+}
+
+/** Cancel running height animations (and any held end height). */
+function stopAnimations(el: HTMLElement) {
+  el.getAnimations().forEach((a) => a.cancel());
+}
+
+/** Ease an element's height, like the map key's open/close; skipped with reduced motion. */
+function animateHeight(el: HTMLElement, start: number, end: number, done?: () => void) {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || start === end) return done?.();
+  const ease = getComputedStyle(el).getPropertyValue('--ease').trim() || 'ease';
+  const run = el.animate(
+    [
+      { height: `${start}px`, overflow: 'hidden' },
+      { height: `${end}px`, overflow: 'hidden' },
+    ],
+    // Hold the end height until the text swap (closing) has rendered.
+    { duration: 320, easing: ease, fill: done ? 'forwards' : 'none' },
+  );
+  if (done) run.onfinish = done;
+}
+
+/**
+ * The project description, cut to a preview when long. "Read full
+ * description" grows the text open; "Show less" eases it shut, then swaps
+ * back to the preview. Same duration and curve as the map key's open/close.
+ */
+function Description({ text }: { text: string }) {
+  const long = text.length > DESCRIPTION_PREVIEW;
+  const preview = `${text.slice(0, DESCRIPTION_PREVIEW).trimEnd()}…`;
+  const [expanded, setExpanded] = useState(false);
+  const [full, setFull] = useState(false); // full text rendered (stays on while closing)
+  const box = useRef<HTMLDivElement>(null);
+  const from = useRef<number | null>(null); // height to animate from after the next render
+  const collapsedHeight = useRef(0);
+
+  // After the full text renders, grow from the preview's height; after the
+  // preview renders, release the held height (same height, so no jump).
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    if (from.current === null) return stopAnimations(el);
+    const start = from.current;
+    from.current = null;
+    stopAnimations(el);
+    animateHeight(el, start, el.offsetHeight);
+  }, [full]);
+
+  function toggle() {
+    const el = box.current;
+    if (!el) return;
+    const current = el.offsetHeight;
+    if (!expanded) {
+      setExpanded(true);
+      if (full) {
+        // Reopening mid-close: the full text is still there; grow back from here.
+        stopAnimations(el);
+        animateHeight(el, current, el.offsetHeight);
+      } else {
+        collapsedHeight.current = current;
+        from.current = current;
+        setFull(true);
+      }
+    } else {
+      setExpanded(false);
+      stopAnimations(el);
+      // Ease shut with the full text, then swap in the preview.
+      animateHeight(el, current, collapsedHeight.current, () => setFull(false));
+    }
+  }
+
+  return (
+    <>
+      <div ref={box}>
+        <p className="drawer-description">{long && !full ? preview : text}</p>
+      </div>
+      {long && (
+        <button className="text-button" aria-expanded={expanded} onClick={toggle}>
+          {expanded ? 'Show less' : 'Read full description'}
+        </button>
+      )}
+    </>
   );
 }
