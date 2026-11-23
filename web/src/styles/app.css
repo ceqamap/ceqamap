@@ -942,14 +942,13 @@ a {
   font-family: var(--sans);
   font-size: 11px;
 }
-/* The credits sit in the controls column, under the zoom buttons, centred on
-   them (38px pill under the 42px zoom group). Open, they grow to the left and
-   scroll sideways if the window is too narrow for them. */
+/* The credits sit in the controls column, under the zoom buttons and as wide
+   as them (42px). Open, they grow to the left and scroll sideways if the
+   window is too narrow for them. */
 .attribution-slot {
   display: flex;
   justify-content: flex-end;
   max-width: calc(100vw - var(--gutter) * 2);
-  margin-right: 2px;
 }
 .attribution-slot:empty {
   display: none; /* before the map exists, so the column has no stray gap */
@@ -961,16 +960,16 @@ a {
   overflow-x: auto;
   scrollbar-width: none;
 }
-/* Attribution as a pill like the map layer button: 38px tall with its border,
-   the info icon a 36px round button at its right end. Expanded, the credits
-   sit inside the same pill. */
+/* Attribution as a pill as wide as the zoom controls: 42px with its border, the
+   info icon a 36px round button inset 2px at its right end, like the zoom
+   buttons in their group. Expanded, the credits sit inside the same pill. */
 .maplibregl-ctrl.maplibregl-ctrl-attrib.maplibregl-compact {
   display: flex;
   align-items: center;
   box-sizing: border-box;
-  min-height: 38px;
+  min-height: 42px;
   margin: 0;
-  padding: 0 36px 0 0;
+  padding: 0 40px 0 0;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--card) 94%, transparent);
@@ -990,9 +989,9 @@ a {
     border-color 0.2s var(--ease);
 }
 .maplibregl-ctrl.maplibregl-ctrl-attrib.maplibregl-compact-show {
-  /* Right: the 36px button plus an 8px gap, so the credits never touch the
-     button's hover circle. */
-  padding: 0 calc(36px + 8px) 0 14px;
+  /* Right: the inset 36px button plus an 8px gap, so the credits never touch
+     the button's hover circle. */
+  padding: 0 calc(2px + 36px + 8px) 0 14px;
 }
 /* The credits stay rendered so they can slide open: width 0 -> auto (browsers
    without interpolate-size or ::details-content simply show them at once),
@@ -1022,8 +1021,8 @@ a {
     visibility 0s;
 }
 .maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-button {
-  top: 0;
-  right: 0;
+  top: 2px;
+  right: 2px;
   width: 36px;
   height: 36px;
   border-radius: 50%;
@@ -1106,35 +1105,34 @@ a {
     padding-top: 8px;
     margin-top: 8px;
   }
+  /* Round, and as wide as the zoom controls and credits below it (42px). */
   .layers-button {
-    width: 40px;
+    width: 42px;
+    height: 42px;
     padding: 0;
     justify-content: center;
     font-size: 0;
     gap: 0;
   }
-  /* Collapsed: the pill, bottom left. Open: a full sheet from the pill's
-     bottom edge to the top gutter, above the header, map layer button and
-     zoom controls (which would otherwise cover the collapse button). Height
-     animates between two lengths, so it eases on every browser; width eases
-     where interpolate-size is supported and snaps elsewhere. */
+  /* Collapsed: a pill along the bottom, its right edge flush with the controls
+     column above. Open: a full sheet up to the top gutter, above the header,
+     map layer button and zoom controls (which would otherwise cover the
+     collapse button). Height animates between two lengths, so it eases on
+     every browser. The credits moved up under the zoom controls, so the key
+     sits on the bottom gutter. */
   .legend {
     display: flex;
     flex-direction: column;
-    width: fit-content;
-    max-width: calc(100% - var(--gutter) * 2);
+    width: calc(100% - var(--gutter) * 2);
     height: 42px; /* 36px button + 2px inset + border, as the collapsed pill */
-    bottom: calc(var(--gutter) + 24px);
-    interpolate-size: allow-keywords;
+    bottom: var(--gutter);
     transition:
       border-radius 320ms var(--ease),
-      height 320ms var(--ease),
-      width 320ms var(--ease);
+      height 320ms var(--ease);
   }
   .legend.open {
     z-index: 4; /* above header (2) and controls (3); below the drawer (5) */
-    width: calc(100% - var(--gutter) * 2);
-    height: calc(100% - var(--gutter) * 2 - 24px);
+    height: calc(100% - var(--gutter) * 2);
   }
   .legend-head {
     flex: none;
