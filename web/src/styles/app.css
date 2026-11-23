@@ -12,6 +12,11 @@ body,
   height: 100%;
   margin: 0;
 }
+html,
+body {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
 
 body {
   font-family: var(--sans);
@@ -65,13 +70,23 @@ a {
 /* ---------------------------------------------------------------- shell */
 
 .app {
-  position: fixed;
-  inset: 0;
+  /* Not position: fixed. iOS 26 Safari won't paint fixed content under its
+     floating address and tab bars; it fills them with the page background
+     instead, leaving pale strips above and below the map. Laid out in flow,
+     the app is the visible area (100% = small viewport) for the panels... */
+  position: relative;
+  height: 100%;
 }
 
 .map {
+  /* ...and the map alone runs on to the large viewport, under the browser's
+     bars where they're translucent. fitPadding() adds the hidden strip. */
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100%;
+  height: max(100%, 100lvh);
 }
 
 .card {
@@ -924,7 +939,8 @@ a {
   font-size: 11px;
 }
 .maplibregl-ctrl-bottom-right {
-  margin: 0 var(--gutter) var(--gutter) 0;
+  /* The map runs past the visible area on mobile; keep the credits in view. */
+  margin: 0 var(--gutter) calc(var(--gutter) + max(0px, 100lvh - 100svh)) 0;
 }
 /* Attribution as a pill like the map layer button: 38px tall with its border,
    the info icon a 36px round button at its right end. Expanded, the credits

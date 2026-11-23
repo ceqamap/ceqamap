@@ -316,5 +316,11 @@ function setFeature(map: MapLibreMap, id: string, state: Record<string, boolean>
 
 function fitPadding() {
   const w = window.innerWidth;
-  return w < 720 ? { top: 120, bottom: 140, left: 16, right: 16 } : { top: 96, bottom: 48, left: 300, right: 96 };
+  // On phones the map runs under the browser's bottom bar (see .map in app.css);
+  // pad by the part of it below the visible area so fits land in view.
+  const map = document.querySelector('.map');
+  const hidden = map ? Math.max(0, Math.round(map.getBoundingClientRect().bottom - window.innerHeight)) : 0;
+  return w < 720
+    ? { top: 120, bottom: 140 + hidden, left: 16, right: 16 }
+    : { top: 96, bottom: 48 + hidden, left: 300, right: 96 };
 }
