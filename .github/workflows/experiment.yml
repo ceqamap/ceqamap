@@ -9,10 +9,13 @@ on:
       script:
         description: 'Script in pipeline/scripts to run'
         type: choice
-        options: [match-intersections, profile-locations, match-landmarks, explain-location]
+        options: [match-intersections, profile-locations, match-landmarks, explain-location, probe-names]
         default: match-intersections
       sch:
         description: 'SCH numbers to explain, comma-separated (explain-location)'
+        default: ''
+      probe:
+        description: 'Census name probes, fips:layer:regex;... (probe-names)'
         default: ''
 
 concurrency:
@@ -59,4 +62,5 @@ jobs:
       - name: Run
         env:
           EXPLAIN: ${{ inputs.sch }}
+          PROBE: ${{ inputs.probe }}
         run: node --max-old-space-size=6144 pipeline/scripts/${{ inputs.script || 'match-intersections' }}.ts
