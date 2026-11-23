@@ -93,8 +93,12 @@ export function Drawer({ sch, mode, onClose, onLoaded }: Props) {
     >
       {shownSch && (
         <>
+          {/* Status, SCH number and close button share the bar (see .drawer-bar). */}
           <div className="drawer-bar">
-            <span className="eyebrow">SCH {shownSch}</span>
+            {state.kind === 'ready' && <StatusChip project={state.project} mode={mode} />}
+            <span className="eyebrow drawer-id">
+              SCH <span className="nowrap">{shownSch}</span>
+            </span>
             <button className="icon-button" onClick={onClose} aria-label="Close project details">
               ✕
             </button>
@@ -102,7 +106,7 @@ export function Drawer({ sch, mode, onClose, onLoaded }: Props) {
           <div className="drawer-body">
             {state.kind === 'loading' && <DrawerSkeleton />}
             {state.kind === 'error' && <p className="muted">{state.message}. Try again in a moment.</p>}
-            {state.kind === 'ready' && <ProjectDetail project={state.project} mode={mode} headingRef={heading} />}
+            {state.kind === 'ready' && <ProjectDetail project={state.project} headingRef={heading} />}
           </div>
         </>
       )}
@@ -110,18 +114,27 @@ export function Drawer({ sch, mode, onClose, onLoaded }: Props) {
   );
 }
 
+/** The project's stage and since when, in the drawer's top bar. */
+function StatusChip({ project: p, mode }: { project: PublishedProject; mode: 'light' | 'dark' }) {
+  const status = STATUS_BY_ID[p.status];
+  return (
+    <p className="status-chip" style={{ ['--chip' as string]: status[mode] }}>
+      <span className="dot" style={{ background: status[mode] }} aria-hidden="true" />
+      {status.label}
+      <span className="muted"> · {formatDate(p.statusDate)}</span>
+    </p>
+  );
+}
+
 function ProjectDetail({
   project: p,
-  mode,
   headingRef,
 }: {
   project: PublishedProject;
-  mode: 'light' | 'dark';
   headingRef: React.RefObject<HTMLHeadingElement | null>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
-  const status = STATUS_BY_ID[p.status];
   const today = todayInCalifornia();
   const longDescription = p.description.length > DESCRIPTION_PREVIEW;
   const description =
@@ -146,22 +159,16 @@ function ProjectDetail({
 
   return (
     <article>
-      <p className="status-chip" style={{ ['--chip' as string]: status[mode] }}>
-        <span className="dot" style={{ background: status[mode] }} aria-hidden="true" />
-        {status.label}
-        <span className="muted"> · {formatDate(p.statusDate)}</span>
-      </p>
-      <h2 id="drawer-title" className="drawer-title" tabIndex={-1} ref={headingRef}>
-        {p.title}
-      </h2>
-      <p className="drawer-agency">{p.leadAgency}</p>
-
       {p.status === 'in_review' && p.reviewEnd && (
         <p className="review-callout">
           <span className="live-dot" aria-hidden="true" />
           {reviewCountdown(p.reviewEnd, today)}
         </p>
       )}
+      <h2 id="drawer-title" className="drawer-title" tabIndex={-1} ref={headingRef}>
+        {p.title}
+      </h2>
+      <p className="drawer-agency">{p.leadAgency}</p>
 
       {(place || p.location) && (
         <p className="drawer-place">
