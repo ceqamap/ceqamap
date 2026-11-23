@@ -106,6 +106,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     let disposed = false;
     let map: MapLibreMap | null = null;
     let raf = 0;
+    let unplaceCredits = () => {};
 
     (async () => {
       let style: StyleSpecification | string;
@@ -136,12 +137,21 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
         cooperativeGestures: false,
       });
       map.touchZoomRotate.disableRotation();
-      // Credits live in the controls column, under the zoom buttons (see
-      // Controls): add the control as usual, then move its element there.
+      // Credits: in the bottom-right corner on desktop; on phones, in the
+      // controls column under the zoom buttons (see Controls). Added as usual,
+      // then moved between the two as the window crosses the breakpoint.
       map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
       const credits = map.getContainer().querySelector('.maplibregl-ctrl-attrib');
-      const slot = document.getElementById('map-attribution');
-      if (credits && slot) slot.appendChild(credits);
+      const corner = credits?.parentElement;
+      const phone = window.matchMedia('(max-width: 719px)');
+      const placeCredits = () => {
+        const slot = document.getElementById('map-attribution');
+        const target = phone.matches && slot ? slot : corner;
+        if (credits && target && credits.parentElement !== target) target.appendChild(credits);
+      };
+      placeCredits();
+      phone.addEventListener('change', placeCredits);
+      unplaceCredits = () => phone.removeEventListener('change', placeCredits);
       mapRef.current = map;
 
       map.on('style.load', () => {
@@ -240,6 +250,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     return () => {
       disposed = true;
       cancelAnimationFrame(raf);
+      unplaceCredits();
       map?.remove();
       mapRef.current = null;
     };
