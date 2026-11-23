@@ -42,7 +42,11 @@ Each project gets the best location available, in this order:
 | Exact         | Coordinates typed by the lead agency, if consistent with listed county | Solid dot           |
 | Address       | A street address in the project's text, geocoded by the Census         | Solid dot           |
 | Cross streets | Where the listed cross streets meet (Census road network)              | Dot, lighter center |
-| Street        | A seeded spot along the one listed street, inside the listed city      | Hollow ring         |
+| Postmile      | State highway postmiles in the project's text (Caltrans)               | Dot, lighter center |
+| Crossing      | Where roads or waterways named in the project's text cross             | Dot, lighter center |
+| Named place   | A beach, island, pass, summit... named in the text (USGS GNIS)         | Dot, lighter center |
+| Street        | A seeded spot along the one listed (or named) short street or creek    | Hollow ring         |
+| Community     | A community named in the text (USGS GNIS)                              | Hollow ring         |
 | ZIP code      | A seeded random spot in the listed ZIP, inside the listed city/county  | Hollow ring         |
 | City          | A seeded random spot inside the listed city (Census outline)           | Hollow ring         |
 | County        | A seeded random spot inside the listed county (Census outline)         | Hollow ring         |
@@ -96,6 +100,33 @@ more than 15 km apart. A named site is drawn like a cross‑street placement (do
 community (e.g. Ocotillo Wells, Studio City) as an approximate ring. On the full dataset (2026‑11‑21) this places about
 14,000 projects; a hand check of 70 looked right in roughly 8 of 10. GNIS no longer lists buildings, schools, parks,
 dams or airports (removed in 2022), so "Black Mountain Middle School" finds the summit, not the school.
+
+**Highway postmiles.** Caltrans locates work on a state highway by county, route and postmile ("in San Diego County
+along SR 76 from PM R16.4 to R16.9", "11-SD-76 PM 16.4/16.9"); postmiles restart at each county line, and a letter
+prefix marks a realigned stretch. `postmiles.ts` reads a postmile only next to a route the text names (so "PM 89-24", a
+parcel map, and "PM10", particulate matter, don't count) and looks it up in a listed county in Caltrans' SHN Postmiles
+Tenth (a point every 0.1 mile, fetched by `scripts/fetch-postmiles.ts`). A range is placed at its middle if it is at
+most 5 miles long; postmiles that disagree by more than 8 km are skipped.
+
+**Roads and waterways named in the text.** Titles and descriptions name roads, highways and creeks far more often
+than the Cross Streets field does: "Install Signs on SR-76", "within Quiota Creek under ... the culvert-bridge known as
+Quiota Crossing 0A", "widen State Route 76 from Melrose Drive to Interstate 15". `namedLines.ts` reads Title Case (or
+all-caps) names ending in a street or water type, and numbered routes, and finds them in Census TIGER/Line roads and
+linear water (streams, rivers, canals; also public domain). In order: two named lines that meet in one place inside the
+listed city or county give a **crossing**; a named place GNIS lists more than once in the county (two "Emigrant Pass"
+in Inyo) is **settled** by a named road within 20 km when the other same-name places are 40 km or more away; a named
+creek with the words crossing, bridge or culvert and no road named goes where it crosses a public road, if all such
+crossings are within 3 km (the one nearest their middle); and one named line that is short in the area gives a spot
+**along** it (still approximate). Two waterways meeting are not a crossing: "Tramp Creek, tributary to the Middle Fork
+Eel River" is about the creek, so it is placed along the stretch of Tramp Creek that reaches that river.
+
+Measured on all 299,469 approximately placed projects (2026‑11‑23, `scripts/match-named-lines.ts`): **1,850 placed at
+postmiles, 10,653 at crossings, 21 at a same-name place settled by a road**, together about 12,300 more projects
+"near a named location" (39,429 → 51,769); another 22,700 move from a random spot in their city or county to a spot
+along a named street or creek (still approximate). A hand check of about 80 (25 county‑level crossings, 12 postmiles,
+plus city crossings and road-settled places) looked right in all but a few; the misses are descriptions naming a road
+that only bounds a much larger area (a redevelopment plan "along River Road"). Before the tributary rule, about a third
+of county‑level crossings were creek mouths.
 
 **ZIP codes.** About 46,000 approximate projects list a valid California ZIP. They are placed at a seeded random spot
 in the Census ZIP Code Tabulation Area (ZCTA), restricted to the part inside the listed city (or county), and only
