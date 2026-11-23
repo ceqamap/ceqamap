@@ -304,12 +304,19 @@ a {
   top: var(--gutter);
   right: var(--gutter);
   z-index: 3;
+  /* The column is as wide as the closed (hidden) layer menu, 200px; on phones
+     that box overlaps the header card. Only the buttons and open menus take
+     taps, so the header's "N new" and time window stay reachable. */
+  pointer-events: none;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 10px;
   /* Moves with the drawer: same distance, duration and easing (see .drawer). */
   transition: transform var(--drawer-out);
+}
+.controls > * {
+  pointer-events: auto;
 }
 .drawer-open .controls {
   transform: translateX(calc(-1 * (var(--drawer-width) + var(--gutter))));
@@ -1101,6 +1108,12 @@ a {
   .live {
     padding-top: 8px;
     margin-top: 8px;
+  }
+  /* Open credits: a full-width card under the info button, like the map key. */
+  .maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-inner {
+    width: calc(100vw - var(--gutter) * 2);
+    max-width: none;
+    text-align: left;
   }
   /* Round, and as wide as the zoom controls and credits below it (42px). */
   .layers-button {
