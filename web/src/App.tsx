@@ -54,6 +54,14 @@ export function App() {
   const openedFromLink = useRef(selected !== null);
 
   const basemap = useMemo(() => basemapById(basemapId), [basemapId]);
+
+  // Phone browsers paint their own bar areas (status bar, iOS Safari's address
+  // and tab bars) with the page background or theme color; the map can't draw
+  // there. Match them to the basemap so they read as map, not as white strips.
+  useEffect(() => {
+    document.documentElement.style.setProperty('--page', basemap.swatch);
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', basemap.swatch);
+  }, [basemap]);
   // Each time window has its own tileset; data built before windows existed has only `tiles`.
   const tilesUrl = meta ? absoluteDataUrl(meta.scopes?.[scope]?.tiles || meta.tiles) : null;
 

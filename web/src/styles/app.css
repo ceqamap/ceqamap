@@ -18,13 +18,17 @@ body {
   overscroll-behavior: none;
 }
 
+html {
+  background: var(--page, var(--paper)); /* set from the basemap in App */
+}
+
 body {
   font-family: var(--sans);
   font-size: 15px;
   line-height: 1.55;
   letter-spacing: -0.011em;
   color: var(--ink);
-  background: var(--paper);
+  background: var(--page, var(--paper));
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
 }
@@ -938,9 +942,24 @@ a {
   font-family: var(--sans);
   font-size: 11px;
 }
-.maplibregl-ctrl-bottom-right {
-  /* The map runs past the visible area on mobile; keep the credits in view. */
-  margin: 0 var(--gutter) calc(var(--gutter) + max(0px, 100lvh - 100svh)) 0;
+/* The credits sit in the controls column, under the zoom buttons, centred on
+   them (38px pill under the 42px zoom group). Open, they grow to the left and
+   scroll sideways if the window is too narrow for them. */
+.attribution-slot {
+  display: flex;
+  justify-content: flex-end;
+  max-width: calc(100vw - var(--gutter) * 2);
+  margin-right: 2px;
+}
+.attribution-slot:empty {
+  display: none; /* before the map exists, so the column has no stray gap */
+}
+.attribution-slot .maplibregl-ctrl-attrib.maplibregl-compact {
+  max-width: 100%;
+}
+.attribution-slot .maplibregl-compact-show .maplibregl-ctrl-attrib-inner {
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 /* Attribution as a pill like the map layer button: 38px tall with its border,
    the info icon a 36px round button at its right end. Expanded, the credits

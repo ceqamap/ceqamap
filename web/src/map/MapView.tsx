@@ -130,10 +130,16 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
         dragRotate: false,
         pitchWithRotate: false,
         touchPitch: false,
-        attributionControl: { compact: true },
+        attributionControl: false,
         cooperativeGestures: false,
       });
       map.touchZoomRotate.disableRotation();
+      // Credits live in the controls column, under the zoom buttons (see
+      // Controls): add the control as usual, then move its element there.
+      map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
+      const credits = map.getContainer().querySelector('.maplibregl-ctrl-attrib');
+      const slot = document.getElementById('map-attribution');
+      if (credits && slot) slot.appendChild(credits);
       mapRef.current = map;
 
       map.on('style.load', () => {
