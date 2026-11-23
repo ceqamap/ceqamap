@@ -98,7 +98,16 @@ export const STATUS_BY_ID: Readonly<Record<ProjectStatus, StatusDefinition>> = O
  * lead agency entered; everything else is a best-effort placement.
  */
 export type LocationPrecision =
-  'exact' | 'address' | 'intersection' | 'landmark' | 'street' | 'community' | 'zip' | 'city' | 'county' | 'region';
+  | 'exact'
+  | 'address'
+  | 'intersection'
+  | 'landmark'
+  | 'street'
+  | 'community'
+  | 'zip'
+  | 'city'
+  | 'county'
+  | 'region';
 
 export const PRECISION_LABEL: Readonly<Record<LocationPrecision, string>> = {
   exact: 'Coordinates provided by the lead agency',
@@ -126,6 +135,28 @@ export const PRECISION_MARK: Readonly<Record<LocationPrecision, 0 | 1 | 2>> = {
   county: 0,
   region: 0,
 };
+
+/** The three map marks, as the legend names and filters them. */
+export type MapMark = 'exact' | 'intersection' | 'approx';
+
+export interface MarkDefinition {
+  id: MapMark;
+  /** Value of the tile point's `x` (see PRECISION_MARK). */
+  x: 0 | 1 | 2;
+  /** Suffix of the cluster count attributes (see markCountKey). */
+  code: 'e' | 'n' | 'a';
+}
+
+/** In legend order. */
+export const MARKS: readonly MarkDefinition[] = [
+  { id: 'exact', x: 1, code: 'e' },
+  { id: 'intersection', x: 2, code: 'n' },
+  { id: 'approx', x: 0, code: 'a' },
+];
+
+export function markOf(x: 0 | 1 | 2): MapMark {
+  return x === 1 ? 'exact' : x === 2 ? 'intersection' : 'approx';
+}
 
 // ---------------------------------------------------------------------------
 // CEQA document types
@@ -265,6 +296,12 @@ export interface PublishedScope {
   byStatus: Record<ProjectStatus, number>;
   /** By map mark: exact (solid), intersection (lighter center), approx (ring). */
   byMark: { exact: number; intersection: number; approx: number };
+  /**
+   * By stage and map mark, so the legend's two filters can count each other.
+   * Present when the tiles carry per stage-and-mark cluster counts
+   * (markCountKey); the location filter is offered only then.
+   */
+  byStageMark?: Record<ProjectStatus, Record<MapMark, number>>;
 }
 
 /**
@@ -317,7 +354,9 @@ export interface TilePointProperties {
   /**
    * One flag per stage (`c_in_review`, `c_scoping`, ...), 1 for this project's
    * stage. Summed by clustering, so a cluster's count can follow the legend's
-   * stage filter without rebuilding tiles.
+   * stage filter without rebuilding tiles. Also one flag for this project's
+   * stage and mark (`c_scoping_e`, see markCountKey), set only when 1, so
+   * clusters can follow the location filter too.
    */
   [stageCount: `c_${string}`]: 0 | 1 | undefined;
 }
@@ -325,6 +364,25 @@ export interface TilePointProperties {
 /** Tile attribute holding a stage's count (see TilePointProperties). */
 export function stageCountKey(status: ProjectStatus): `c_${ProjectStatus}` {
   return `c_${status}`;
+}
+
+/**
+ * Tile attribute holding a cluster's count for one stage and mark, e.g.
+ * `c_scoping_e`. Points carry only their own (value 1); clustering sums them,
+ * and a cluster without one has none of that kind.
+ */
+export function markCountKey(status: ProjectStatus, mark: MapMark): `c_${ProjectStatus}_${'e' | 'n' | 'a'}` {
+  return `c_${status}_${MARKS.find((m) => m.id === mark)!.code}`;
+}
+
+/** A project's one stage-and-mark flag for its tile point (see markCountKey). */
+export function markFlag(status: ProjectStatus, mark: MapMark): Record<`c_${string}`, 1> {
+  return { [markCountKey(status, mark)]: 1 } as Record<`c_${string}`, 1>;
+}
+
+/** Every stage-and-mark count key, for tippecanoe's --accumulate-attribute. */
+export function allMarkCountKeys(): string[] {
+  return STATUSES.flatMap((s) => MARKS.map((m) => markCountKey(s.id, m.id)));
 }
 
 /** The per-stage flags for one project's tile point. */

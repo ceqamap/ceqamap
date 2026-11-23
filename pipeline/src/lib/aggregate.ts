@@ -1,6 +1,8 @@
 import {
   DOCUMENT_TYPES,
   PRECISION_MARK,
+  markFlag,
+  markOf,
   stageFlags,
   type LocationPrecision,
   type ProjectStatus,
@@ -189,6 +191,8 @@ export function aggregate(
           r: p.status === 'in_review' ? 1 : 0,
           // One flag per stage so clusters can sum them (see TilePointProperties).
           ...stageFlags(p.status),
+          // And one for this stage and mark, for the legend's location filter.
+          ...markFlag(p.status, markOf(PRECISION_MARK[p.location.precision])),
         },
       });
     }

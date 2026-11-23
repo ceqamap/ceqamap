@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   inScope,
+  type MapMark,
+  markOf,
   narrowestScopeFor,
+  PRECISION_MARK,
   type ProjectStatus,
   type PublishedMeta,
   type PublishedProject,
@@ -13,7 +16,7 @@ import { Header } from './components/Header.tsx';
 import { HoverCard } from './components/HoverCard.tsx';
 import { Legend } from './components/Legend.tsx';
 import { absoluteDataUrl, DataStatusError, fetchMeta, META_POLL_MS, META_POLL_PENDING_MS } from './lib/data.ts';
-import { filterParams, readScope, readStages } from './lib/filters.ts';
+import { ALL_MARKS, filterParams, marksSupported, readMarks, readScope, readStages } from './lib/filters.ts';
 import { todayInCalifornia } from './lib/format.ts';
 import { basemapById, type BasemapId } from './map/basemaps.ts';
 import { type HoverInfo, MapView, type MapViewHandle } from './map/MapView.tsx';
@@ -24,6 +27,7 @@ import { type HoverInfo, MapView, type MapViewHandle } from './map/MapView.tsx';
  *   ?b=imagery      basemap
  *   ?t=30d          time window (default: past 12 months)
  *   ?stages=…       stages shown (default: all); see lib/filters.ts
+ *   ?marks=…        locations shown (default: all); see lib/filters.ts
  *   #map=12/40.58/-122.39   map position (managed by MapLibre)
  */
 function readParam(name: string): string | null {
@@ -49,6 +53,7 @@ export function App() {
   const [selected, setSelected] = useState<string | null>(() => readParam('p'));
   const [scope, setScope] = useState<TimeScope>(() => readScope(new URLSearchParams(location.search)));
   const [stages, setStages] = useState<ProjectStatus[]>(() => readStages(new URLSearchParams(location.search)));
+  const [marksWanted, setMarks] = useState<MapMark[]>(() => readMarks(new URLSearchParams(location.search)));
   const [hover, setHover] = useState<HoverInfo | null>(null);
   const [focus, setFocus] = useState<{ lon: number; lat: number } | null>(null);
   const openedFromLink = useRef(selected !== null);
@@ -62,6 +67,11 @@ export function App() {
     document.documentElement.style.setProperty('--page', basemap.swatch);
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', basemap.swatch);
   }, [basemap]);
+  // The location filter needs per stage-and-location counts in the data; until
+  // a build has them, every location shows (and the legend's rows don't toggle).
+  const canFilterMarks = marksSupported(meta, scope);
+  const marks = canFilterMarks ? marksWanted : ALL_MARKS;
+
   // Each time window has its own tileset; data built before windows existed has only `tiles`.
   const tilesUrl = meta ? absoluteDataUrl(meta.scopes?.[scope]?.tiles || meta.tiles) : null;
 
@@ -103,6 +113,7 @@ export function App() {
       setSelected(params.get('p'));
       setScope(readScope(params));
       setStages(readStages(params));
+      setMarks(readMarks(params));
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
@@ -114,13 +125,18 @@ export function App() {
   }, []);
   const close = useCallback(() => select(null), [select]);
 
-  const changeFilters = useCallback((nextScope: TimeScope, nextStages: ProjectStatus[]) => {
-    setScope(nextScope);
-    setStages(nextStages);
-    const params = filterParams(nextScope, nextStages);
-    writeParam('t', params.t, false);
-    writeParam('stages', params.stages, false);
-  }, []);
+  const changeFilters = useCallback(
+    (nextScope: TimeScope, nextStages: ProjectStatus[], nextMarks: readonly MapMark[]) => {
+      setScope(nextScope);
+      setStages(nextStages);
+      setMarks([...nextMarks]);
+      const params = filterParams(nextScope, nextStages, nextMarks);
+      writeParam('t', params.t, false);
+      writeParam('stages', params.stages, false);
+      writeParam('marks', params.marks, false);
+    },
+    [],
+  );
 
   // "N new" in the header steps through the latest arrivals, one project at a
   // time: fly there and open it. (They are spread across the state, so framing
@@ -141,8 +157,8 @@ export function App() {
   }, [arrivalIndex, mappedArrivals, select]);
 
   // Latest values for callbacks that should not re-run on every filter change.
-  const current = useRef({ scope, stages, meta });
-  current.current = { scope, stages, meta };
+  const current = useRef({ scope, stages, marks: marksWanted, meta });
+  current.current = { scope, stages, marks: marksWanted, meta };
 
   const onLoaded = useCallback(
     (p: PublishedProject) => {
@@ -150,8 +166,8 @@ export function App() {
       if (openedFromLink.current && p.location) {
         setFocus({ lon: p.location.lon, lat: p.location.lat });
         // Make sure the linked project is actually drawn: widen the time
-        // window and show its stage if the current filters hide it.
-        const { scope: s, stages: st, meta: m } = current.current;
+        // window and show its stage and location if the current filters hide it.
+        const { scope: s, stages: st, marks: mk, meta: m } = current.current;
         const facts = {
           lastFiling: p.documents[0]?.received ?? p.statusDate,
           status: p.status,
@@ -160,7 +176,9 @@ export function App() {
         const today = todayInCalifornia();
         const nextScope = inScope(s, today, facts) ? s : narrowestScopeFor(today, facts);
         const nextStages = st.includes(p.status) ? st : [...st, p.status];
-        if (nextScope !== s || nextStages !== st) changeFilters(nextScope, nextStages);
+        const mark = markOf(PRECISION_MARK[p.location.precision]);
+        const nextMarks = mk.includes(mark) ? mk : ALL_MARKS.filter((x) => x === mark || mk.includes(x));
+        if (nextScope !== s || nextStages !== st || nextMarks !== mk) changeFilters(nextScope, nextStages, nextMarks);
       }
       openedFromLink.current = false;
     },
@@ -180,6 +198,7 @@ export function App() {
         basemap={basemap}
         tilesUrl={tilesUrl}
         stages={stages}
+        marks={marks}
         selected={selected}
         focus={focus}
         onHover={canHover ? setHover : () => {}}
@@ -197,7 +216,8 @@ export function App() {
         status={dataStatus}
         scope={scope}
         stages={stages}
-        onScope={(t) => changeFilters(t, stages)}
+        marks={marks}
+        onScope={(t) => changeFilters(t, stages, marksWanted)}
         arrivalIndex={arrivalIndex}
         onNextArrival={nextArrival}
       />
@@ -213,7 +233,10 @@ export function App() {
         mode={basemap.mode}
         scope={scope}
         stages={stages}
-        onStages={(st) => changeFilters(scope, st)}
+        marks={marks}
+        canFilterMarks={canFilterMarks}
+        onStages={(st) => changeFilters(scope, st, marksWanted)}
+        onMarks={(m) => changeFilters(scope, stages, m)}
       />
       <HoverCard info={hover} mode={basemap.mode} arrivals={meta?.arrivals} />
       {mapError && (

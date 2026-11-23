@@ -553,8 +553,30 @@ a {
   text-decoration: line-through;
   text-decoration-color: var(--line-strong);
 }
+/* First row of each list: a hint, or "Show all …" once something is hidden.
+   Fixed height, so toggling never moves the rows below it. */
+.legend-filter-row {
+  display: flex;
+  align-items: center;
+  height: 22px;
+  margin: 2px 0 2px;
+  font-size: 12.5px;
+}
+.legend-hint {
+  color: var(--faint);
+}
+/* Hidden locations: the mark fades, the label is struck through like a stage. */
+.legend-list.precision .stage-toggle.off .dot {
+  opacity: 0.35;
+}
+.legend-static {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+}
 .legend-reset {
-  margin: 6px 0 0;
+  margin: 0;
   padding: 0;
   border: 0;
   background: none;

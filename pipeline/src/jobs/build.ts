@@ -13,6 +13,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
+  allMarkCountKeys,
   type PublishedMeta,
   type PublishedScope,
   STATUSES,
@@ -155,9 +156,14 @@ log.info('Aggregated', {
 
 // Tippecanoe, once per time window: cluster overlapping points below z13,
 // keep every point (no dropping) so the map is a complete census, and sum the
-// per-stage flags, `r` (in review) and `n` (arrivals) so clusters can follow
-// the legend's stage filter and show what they contain.
-const accumulate = ['r', 'n', ...STAGE_KEYS].flatMap((k) => ['--accumulate-attribute', `${k}:sum`]);
+// per-stage flags, the per stage-and-mark flags, `r` (in review) and `n`
+// (arrivals) so clusters can follow the legend's stage and location filters
+// and show what they contain. A point carries only its own stage-and-mark
+// flag; tippecanoe adds a key a cluster lacks when it merges a point that has it.
+const accumulate = ['r', 'n', ...STAGE_KEYS, ...allMarkCountKeys()].flatMap((k) => [
+  '--accumulate-attribute',
+  `${k}:sum`,
+]);
 for (const scope of TIME_SCOPES) {
   const tippecanoe = spawnSync(
     process.env.TIPPECANOE ?? 'tippecanoe',

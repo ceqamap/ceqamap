@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+  type MapMark,
   type ProjectStatus,
   type PublishedMeta,
   TIME_SCOPES,
@@ -15,6 +16,7 @@ interface Props {
   status: DataStatusError | null;
   scope: TimeScope;
   stages: readonly ProjectStatus[];
+  marks: readonly MapMark[];
   onScope: (scope: TimeScope) => void;
   /** Position in the tour of arrivals (null before the first click). */
   arrivalIndex: number | null;
@@ -29,7 +31,7 @@ function syncPing(el: HTMLElement | null) {
   }
 }
 
-export function Header({ meta, status, scope, stages, onScope, arrivalIndex, onNextArrival }: Props) {
+export function Header({ meta, status, scope, stages, marks, onScope, arrivalIndex, onNextArrival }: Props) {
   // Re-render every minute so "updated N minutes ago" stays honest.
   const [, setTick] = useState(0);
   useEffect(() => {
@@ -78,7 +80,7 @@ export function Header({ meta, status, scope, stages, onScope, arrivalIndex, onN
                 )}
               </span>
               <span className="live-line">
-                {formatNumber(shownCount(meta, scope, stages))} projects
+                {formatNumber(shownCount(meta, scope, stages, marks))} projects
                 {meta.scopes && (
                   <>
                     {' · '}

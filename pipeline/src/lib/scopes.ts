@@ -1,5 +1,7 @@
 import {
   inScope,
+  type MapMark,
+  markOf,
   type ProjectStatus,
   type PublishedProject,
   type PublishedScope,
@@ -14,7 +16,8 @@ import type { PointFeature } from './aggregate.ts';
  * Each window gets its own clustered tileset. Clusters are computed when tiles
  * are built, so filtering points in the browser would leave cluster counts
  * wrong; a tileset per window keeps them exact. Stage filtering does not need
- * this, because clusters carry per-stage counts (see TilePointProperties).
+ * this, because clusters carry per-stage counts (see TilePointProperties);
+ * nor does the location filter (per stage-and-mark counts).
  */
 
 export interface ScopeSplit {
@@ -41,6 +44,9 @@ export function splitByScope(
       number
     >;
     const byMark = { exact: 0, intersection: 0, approx: 0 };
+    const byStageMark = Object.fromEntries(
+      Object.keys(byStatus).map((s) => [s, { exact: 0, intersection: 0, approx: 0 }]),
+    ) as Record<ProjectStatus, Record<MapMark, number>>;
     const selected: PointFeature[] = [];
     for (const f of points) {
       const p = f.properties;
@@ -52,11 +58,10 @@ export function splitByScope(
       if (!keep) continue;
       selected.push(f);
       byStatus[p.s]++;
-      if (p.x === 1) byMark.exact++;
-      else if (p.x === 2) byMark.intersection++;
-      else byMark.approx++;
+      byMark[markOf(p.x)]++;
+      byStageMark[p.s][markOf(p.x)]++;
     }
-    out[scope.id] = { points: selected, counts: { mapped: selected.length, byStatus, byMark } };
+    out[scope.id] = { points: selected, counts: { mapped: selected.length, byStatus, byMark, byStageMark } };
   }
   return out;
 }

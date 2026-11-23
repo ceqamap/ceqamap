@@ -2,7 +2,7 @@ import maplibregl, { type MapGeoJSONFeature, type Map as MapLibreMap, type Style
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Protocol } from 'pmtiles';
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
-import type { ProjectStatus, TilePointProperties } from '../../../packages/shared/src/index.ts';
+import type { MapMark, ProjectStatus, TilePointProperties } from '../../../packages/shared/src/index.ts';
 import { pingProgress } from '../lib/motion.ts';
 import { type Basemap, GLYPHS } from './basemaps.ts';
 import {
@@ -33,6 +33,8 @@ export interface MapViewProps {
   tilesUrl: string | null;
   /** Stages the legend shows. */
   stages: readonly ProjectStatus[];
+  /** Locations (map marks) the legend shows. */
+  marks: readonly MapMark[];
   selected: string | null;
   /** Fly here when a project is opened from a link and is off-screen. */
   focus: { lon: number; lat: number } | null;
@@ -154,7 +156,8 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
 
       map.on('mousemove', (e) => {
         const f = map!.queryRenderedFeatures(e.point, { layers: INTERACTIVE_LAYERS })[0] as
-          MapGeoJSONFeature | undefined;
+          | MapGeoJSONFeature
+          | undefined;
         setHovered(map!, f && !f.properties.point_count ? String(f.properties.id) : null);
         map!.getCanvas().style.cursor = f ? 'pointer' : '';
         if (!f) return latest.current.onHover(null);
@@ -163,7 +166,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
             kind: 'cluster',
             x: e.point.x,
             y: e.point.y,
-            ...clusterCounts(f.properties, latest.current.stages),
+            ...clusterCounts(f.properties, latest.current.stages, latest.current.marks),
           });
         } else {
           latest.current.onHover({
@@ -181,7 +184,8 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
 
       map.on('click', (e) => {
         const f = map!.queryRenderedFeatures(e.point, { layers: INTERACTIVE_LAYERS })[0] as
-          MapGeoJSONFeature | undefined;
+          | MapGeoJSONFeature
+          | undefined;
         if (!f) return latest.current.onSelect(null);
         if (f.properties.point_count) {
           const [lon, lat] = (f.geometry as { coordinates: [number, number] }).coordinates;
@@ -212,7 +216,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
             map!.setPaintProperty(
               LAYER.arrivals,
               'circle-radius',
-              arrivalRadius(latest.current.stages, ping, latest.current.selected),
+              arrivalRadius(latest.current.stages, ping, latest.current.selected, latest.current.marks),
             );
             map!.setPaintProperty(LAYER.arrivals, 'circle-stroke-opacity', arrivalOpacity(ping));
           }
@@ -224,7 +228,11 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     function addDataLayers(m: MapLibreMap) {
       const { tilesUrl, basemap } = latest.current;
       if (!tilesUrl) return;
-      ensureProjectLayers(m, tilesUrl, { mode: basemap.mode, stages: latest.current.stages });
+      ensureProjectLayers(m, tilesUrl, {
+        mode: basemap.mode,
+        stages: latest.current.stages,
+        marks: latest.current.marks,
+      });
       appliedTiles.current = tilesUrl;
       // Feature state does not survive a style change; restore the selection.
       hoveredId.current = null;
@@ -267,20 +275,26 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     if (!map || !props.tilesUrl || appliedTiles.current === props.tilesUrl || !styleReady.current) return;
     const source = map.getSource(SOURCE_ID) as maplibregl.VectorTileSource | undefined;
     if (source) source.setUrl(`pmtiles://${props.tilesUrl}`);
-    else ensureProjectLayers(map, props.tilesUrl, { mode: props.basemap.mode, stages: latest.current.stages });
+    else
+      ensureProjectLayers(map, props.tilesUrl, {
+        mode: props.basemap.mode,
+        stages: latest.current.stages,
+        marks: latest.current.marks,
+      });
     appliedTiles.current = props.tilesUrl;
   }, [props.tilesUrl, props.basemap.mode]);
 
-  // --- Legend stage filter: restyle in place, no tile reload ---------------
-  const appliedStages = useRef(props.stages);
+  // --- Legend stage and location filters: restyle in place, no tile reload --
+  const appliedFilters = useRef({ stages: props.stages, marks: props.marks });
   useEffect(() => {
     const map = mapRef.current;
-    if (appliedStages.current === props.stages) return;
-    appliedStages.current = props.stages;
-    // Before the style is ready, style.load adds the layers with the latest stages.
+    const applied = appliedFilters.current;
+    if (applied.stages === props.stages && applied.marks === props.marks) return;
+    appliedFilters.current = { stages: props.stages, marks: props.marks };
+    // Before the style is ready, style.load adds the layers with the latest filters.
     if (!map || !styleReady.current || !map.getSource(SOURCE_ID)) return;
-    applyStages(map, { mode: props.basemap.mode, stages: props.stages });
-  }, [props.stages, props.basemap.mode]);
+    applyStages(map, { mode: props.basemap.mode, stages: props.stages, marks: props.marks });
+  }, [props.stages, props.marks, props.basemap.mode]);
 
   // --- Selection highlight -------------------------------------------------
   useEffect(() => {
