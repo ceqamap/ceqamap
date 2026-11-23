@@ -14,6 +14,14 @@ import type { CeqaDocument } from './document.ts';
 import { pointInShape } from './geometry.ts';
 import { buildRoadIndex, findIntersection, placeAlongStreet, type StreetResult } from './intersections.ts';
 import { log } from './log.ts';
+import {
+  buildRoadGrid,
+  type LinePlacement,
+  type LineRequest,
+  type RoadGrid,
+  resolveLines,
+  waterKey,
+} from './namedLines.ts';
 import { parseCrossStreets, parseSingleStreet, streetKeys } from './streets.ts';
 import type { ShapefileFeature } from './shapefile.ts';
 
@@ -69,41 +77,93 @@ export interface CrossStreetStats {
   outcomes: Record<string, number>;
 }
 
+export interface NamedLineInput {
+  requests: LineRequest[];
+  /** That county's Census linear water (streams, rivers, canals), or null to skip. */
+  loadWater: (countyKey: string) => Promise<ShapefileFeature[] | null>;
+}
+
 /**
  * Resolve all requests. `loadRoads(countyKey)` supplies that county's Census
- * roads (or null to skip it).
+ * roads (or null to skip it). Named-line requests (roads and waterways in the
+ * project text, see namedLines.ts) are resolved in the same pass, so each
+ * county's roads are read once.
  */
 export async function placeAtCrossStreets(
   requests: CrossStreetRequest[],
   b: Boundaries,
   loadRoads: (countyKey: string) => Promise<ShapefileFeature[] | null>,
-): Promise<{ placements: Map<string, CrossStreetPlacement>; stats: CrossStreetStats }> {
+  lineInput: NamedLineInput = { requests: [], loadWater: async () => null },
+): Promise<{
+  placements: Map<string, CrossStreetPlacement>;
+  stats: CrossStreetStats;
+  linePlacements: Map<string, LinePlacement>;
+  lineStats: CrossStreetStats;
+}> {
   type Result =
     | { ok: true; lon: number; lat: number; streets: string[] }
     | { ok: false; reason: string }
     | (StreetResult & { streets?: string[] });
   const results = new Map<string, Result>();
   const byCounty = new Map<string, CrossStreetRequest[]>();
+  const linesByCounty = new Map<string, LineRequest[]>();
   for (const r of requests) {
     for (const c of r.counties) {
       const list = byCounty.get(c);
       if (list) list.push(r);
       else byCounty.set(c, [r]);
+      if (!linesByCounty.has(c)) linesByCounty.set(c, []);
     }
   }
+  for (const r of lineInput.requests) {
+    for (const c of r.counties) {
+      const list = linesByCounty.get(c);
+      if (list) list.push(r);
+      else linesByCounty.set(c, [r]);
+      if (!byCounty.has(c)) byCounty.set(c, []);
+    }
+  }
+  type LineResult = { ok: true; placement: LinePlacement } | { ok: false; reason: string };
+  const lineResults = new Map<string, LineResult>();
+  // A crossing or a settled place beats a spot along one line from another county.
+  const strength = (x: LineResult | undefined) => (!x?.ok ? 0 : x.placement.kind === 'along' ? 1 : 2);
 
   for (const [county, reqs] of byCounty) {
     const pending = reqs.filter((r) => !results.get(r.sch)?.ok);
-    if (pending.length === 0) continue;
+    const pendingLines = (linesByCounty.get(county) ?? []).filter((r) => strength(lineResults.get(r.sch)) < 2);
+    if (pending.length === 0 && pendingLines.length === 0) continue;
     const wanted = new Set<string>();
     for (const r of pending)
       for (const n of r.names) {
         const k = streetKeys(n);
         if (k) wanted.add(k.full).add(k.nodir).add(k.base);
       }
+    // Text names are matched strictly (full name, ignoring a leading direction).
+    for (const r of pendingLines)
+      for (const n of r.roads) {
+        const k = streetKeys(n);
+        if (k) wanted.add(k.full).add(k.nodir);
+      }
     const roads = await loadRoads(county);
     if (!roads) continue;
     const index = buildRoadIndex(roads, wanted);
+    if (pendingLines.length > 0) {
+      const wantedWater = new Set(pendingLines.flatMap((r) => r.waters.map(waterKey).filter((k): k is string => !!k)));
+      const waterFeatures = wantedWater.size > 0 ? await lineInput.loadWater(county) : null;
+      const water = waterFeatures ? buildRoadIndex(waterFeatures, wantedWater) : null;
+      let grid: RoadGrid | null = null;
+      for (const r of pendingLines) {
+        const res = resolveLines(
+          r,
+          { city: r.city, county: b.counties[county] },
+          index,
+          water,
+          () => (grid ??= buildRoadGrid(roads)),
+        );
+        const prev = lineResults.get(r.sch);
+        if (strength(res) > strength(prev) || !prev) lineResults.set(r.sch, res);
+      }
+    }
     for (const r of pending) {
       const area = { city: r.city, county: b.counties[county] };
       const res: Result = r.single
@@ -129,5 +189,20 @@ export async function placeAtCrossStreets(
       });
   }
   log.info('Cross-street placement', { requests: requests.length, outcomes });
-  return { placements, stats: { requests: requests.length, outcomes } };
+
+  const linePlacements = new Map<string, LinePlacement>();
+  const lineOutcomes: Record<string, number> = {};
+  for (const r of lineInput.requests) {
+    const res = lineResults.get(r.sch);
+    const key = res ? (res.ok ? res.placement.kind : res.reason) : 'no-roads';
+    lineOutcomes[key] = (lineOutcomes[key] ?? 0) + 1;
+    if (res?.ok) linePlacements.set(r.sch, res.placement);
+  }
+  log.info('Named-line placement', { requests: lineInput.requests.length, outcomes: lineOutcomes });
+  return {
+    placements,
+    stats: { requests: requests.length, outcomes },
+    linePlacements,
+    lineStats: { requests: lineInput.requests.length, outcomes: lineOutcomes },
+  };
 }

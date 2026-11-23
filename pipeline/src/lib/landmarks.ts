@@ -242,8 +242,21 @@ export interface LandmarkPlacement {
   rank: 1 | 2 | 3;
 }
 
-export type LandmarkOutcome =
-  { kind: 'placed'; placement: LandmarkPlacement } | { kind: 'none' | 'ambiguous' | 'multi-site' | 'far-from-city' };
+/**
+ * A name with several same-class places in the listed counties. A road or
+ * waterway the project names can tell which one is meant (see namedLines.ts).
+ */
+export interface AmbiguousPlace {
+  name: string;
+  featureClass: string;
+  rank: 1 | 2 | 3;
+  candidates: { lon: number; lat: number }[];
+}
+
+export type LandmarkOutcome = (
+  | { kind: 'placed'; placement: LandmarkPlacement }
+  | { kind: 'none' | 'ambiguous' | 'multi-site' | 'far-from-city' }
+) & { ambiguous?: AmbiguousPlace[] };
 
 export interface LandmarkContext {
   /** Normalized county names the project lists. */
@@ -257,7 +270,7 @@ export interface LandmarkContext {
 export function findLandmark(texts: readonly string[], g: Gazetteer, ctx: LandmarkContext): LandmarkOutcome {
   if (ctx.counties.length === 0) return { kind: 'none' };
   const counties = new Set(ctx.counties);
-  let sawAmbiguous = false;
+  const ambiguous: AmbiguousPlace[] = [];
   let sawFar = false;
   const found: (LandmarkPlacement & { field: number; words: number })[] = [];
 
@@ -277,7 +290,14 @@ export function findLandmark(texts: readonly string[], g: Gazetteer, ctx: Landma
     const best = Math.min(...features.map((f) => CLASS_RANK[f.c] ?? 9));
     features = features.filter((f) => CLASS_RANK[f.c] === best);
     if (spreadKm(features) > SAME_NAME_SPREAD_KM) {
-      sawAmbiguous = true;
+      // Sub-runs of a longer name ("Pass" of "Emigrant Pass") repeat the same features: keep the longest.
+      if (!ambiguous.some((a) => a.name.includes(features[0].n)))
+        ambiguous.push({
+          name: features[0].n,
+          featureClass: features[0].c,
+          rank: CLASS_RANK[features[0].c],
+          candidates: features.map((f) => ({ lon: f.lon, lat: f.lat })),
+        });
       continue;
     }
     const f = features[0];
@@ -292,14 +312,15 @@ export function findLandmark(texts: readonly string[], g: Gazetteer, ctx: Landma
     });
   }
 
-  if (found.length === 0) return { kind: sawAmbiguous ? 'ambiguous' : sawFar ? 'far-from-city' : 'none' };
+  const extra = ambiguous.length > 0 ? { ambiguous } : {};
+  if (found.length === 0) return { kind: ambiguous.length ? 'ambiguous' : sawFar ? 'far-from-city' : 'none', ...extra };
   // Communities only count when nothing more specific was named.
   const specific = found.filter((f) => f.rank < 3);
   const pool = specific.length > 0 ? specific : found;
   if (spreadKm(pool) > MULTI_SITE_KM) return { kind: 'multi-site' };
   pool.sort((a, b) => a.rank - b.rank || b.words - a.words || a.field - b.field);
   const { field: _f, words: _w, ...placement } = pool[0];
-  return { kind: 'placed', placement };
+  return { kind: 'placed', placement, ...extra };
 }
 
 function spreadKm(points: readonly { lon: number; lat: number }[]): number {

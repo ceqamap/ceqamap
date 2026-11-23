@@ -1,6 +1,6 @@
 /**
- * Census TIGER/Line road files for California, one per county (public
- * domain). Downloaded on demand into a cache directory (kept between runs by
+ * Census TIGER/Line road and linear water (streams, rivers, canals) files for
+ * California, one per county (public domain). Downloaded on demand into a cache directory (kept between runs by
  * the GitHub Actions cache) and verified, since census.gov occasionally
  * serves truncated or corrupt zips.
  */
@@ -26,15 +26,22 @@ export function countyFips(b: Boundaries): Map<string, string> {
   return new Map(keys.map((k, i) => [k, String(2 * i + 1).padStart(3, '0')]));
 }
 
-async function tryVintage(dirRoot: string, fips: string, vintage: string): Promise<ShapefileFeature[] | null> {
-  const name = `tl_${vintage}_06${fips}_roads`;
+export type TigerLayer = 'roads' | 'linearwater';
+
+async function tryVintage(
+  dirRoot: string,
+  fips: string,
+  vintage: string,
+  layer: TigerLayer,
+): Promise<ShapefileFeature[] | null> {
+  const name = `tl_${vintage}_06${fips}_${layer}`;
   const dir = join(dirRoot, name);
   if (!existsSync(join(dir, `${name}.shp`))) {
     await mkdir(dir, { recursive: true });
     const zip = join(dir, `${name}.zip`);
     let ok = false;
     for (let attempt = 1; attempt <= 3 && !ok; attempt++) {
-      const res = await fetch(`https://www2.census.gov/geo/tiger/TIGER${vintage}/ROADS/${name}.zip`);
+      const res = await fetch(`https://www2.census.gov/geo/tiger/TIGER${vintage}/${layer.toUpperCase()}/${name}.zip`);
       if (res.status === 404) return null;
       if (res.ok) {
         await writeFile(zip, new Uint8Array(await res.arrayBuffer()));
@@ -42,7 +49,7 @@ async function tryVintage(dirRoot: string, fips: string, vintage: string): Promi
           execFileSync('unzip', ['-t', '-q', zip], { stdio: 'pipe' });
           ok = true;
         } catch {
-          log.warn('Corrupt Census road file; retrying', { name, attempt });
+          log.warn('Corrupt Census file; retrying', { name, attempt });
           await new Promise((r) => setTimeout(r, attempt * 5000));
         }
       }
@@ -57,14 +64,23 @@ async function tryVintage(dirRoot: string, fips: string, vintage: string): Promi
 }
 
 /** One county's roads, or null (with a warning) if no vintage is usable. */
-export async function countyRoads(dirRoot: string, fips: string): Promise<ShapefileFeature[] | null> {
+export function countyRoads(dirRoot: string, fips: string): Promise<ShapefileFeature[] | null> {
+  return countyLayer(dirRoot, fips, 'roads');
+}
+
+/** One county's named and unnamed streams, rivers, canals and ditches (lines). */
+export function countyWater(dirRoot: string, fips: string): Promise<ShapefileFeature[] | null> {
+  return countyLayer(dirRoot, fips, 'linearwater');
+}
+
+async function countyLayer(dirRoot: string, fips: string, layer: TigerLayer): Promise<ShapefileFeature[] | null> {
   for (const vintage of [TIGER_VINTAGE, ...FALLBACK_VINTAGES]) {
-    const roads = await tryVintage(dirRoot, fips, vintage);
-    if (roads) {
-      if (vintage !== TIGER_VINTAGE) log.warn('Using fallback Census road vintage', { fips, vintage });
-      return roads;
+    const features = await tryVintage(dirRoot, fips, vintage, layer);
+    if (features) {
+      if (vintage !== TIGER_VINTAGE) log.warn('Using fallback Census vintage', { fips, layer, vintage });
+      return features;
     }
   }
-  log.warn('No usable Census road file; skipping county', { fips });
+  log.warn('No usable Census file; skipping county', { fips, layer });
   return null;
 }

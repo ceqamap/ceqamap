@@ -110,12 +110,15 @@ jobs:
           make -C /tmp/tippecanoe -j"$(nproc)"
           mkdir -p ~/.local/bin && cp /tmp/tippecanoe/tippecanoe ~/.local/bin/
 
-      - name: Restore Census road files
+      - name: Restore Census road and water files
         if: steps.decide.outputs.build == 'true'
         uses: actions/cache@v6
         with:
           path: .tiger
-          key: tiger-roads-2024-ca
+          # Roads and linear water (streams, canals) per county. The cache is
+          # immutable once saved: change the key when adding layers.
+          key: tiger-2024-ca-roads-water
+          restore-keys: tiger-roads-2024-ca
 
       - name: Restore named places (USGS GNIS)
         if: steps.decide.outputs.build == 'true'
@@ -129,6 +132,19 @@ jobs:
         # Optional: if USGS is unreachable, the build places these projects the old way.
         continue-on-error: true
         run: test -f pipeline/data/gnis.json || node pipeline/scripts/fetch-gnis.ts
+
+      - name: Restore highway postmiles (Caltrans)
+        if: steps.decide.outputs.build == 'true'
+        uses: actions/cache@v6
+        with:
+          path: pipeline/data/postmiles.json
+          key: postmiles-${{ hashFiles('pipeline/scripts/fetch-postmiles.ts', 'pipeline/src/lib/postmiles.ts') }}
+
+      - name: Ensure highway postmiles
+        if: steps.decide.outputs.build == 'true'
+        # Optional: if Caltrans is unreachable, the build places these projects the old way.
+        continue-on-error: true
+        run: test -f pipeline/data/postmiles.json || node pipeline/scripts/fetch-postmiles.ts
 
       - name: Build data
         if: steps.decide.outputs.build == 'true'

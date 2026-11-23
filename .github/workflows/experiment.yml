@@ -9,7 +9,8 @@ on:
       script:
         description: 'Script in pipeline/scripts to run'
         type: choice
-        options: [match-intersections, profile-locations, match-landmarks, explain-location, probe-names]
+        options:
+          [match-intersections, profile-locations, match-landmarks, explain-location, probe-names, match-named-lines]
         default: match-intersections
       sch:
         description: 'SCH numbers to explain, comma-separated (explain-location)'
@@ -44,11 +45,14 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile --filter @ceqa-atlas/pipeline...
-      - name: Restore Census road files
+      - name: Restore Census road and water files
         uses: actions/cache@v6
         with:
           path: .tiger
-          key: tiger-roads-2024-ca
+          # Roads and linear water (streams, canals) per county. The cache is
+          # immutable once saved: change the key when adding layers.
+          key: tiger-2024-ca-roads-water
+          restore-keys: tiger-roads-2024-ca
       - name: Restore city, county and ZIP boundaries
         uses: actions/cache@v6
         with:
@@ -57,8 +61,12 @@ jobs:
       - name: Ensure city, county and ZIP boundaries
         run: node pipeline/scripts/boundaries-current.ts || NODE_OPTIONS=--max-old-space-size=8192 pnpm --filter @ceqa-atlas/pipeline boundaries
       - name: Fetch GNIS names
-        if: inputs.script == 'match-landmarks' || inputs.script == 'explain-location'
+        if: inputs.script == 'match-landmarks' || inputs.script == 'explain-location' || inputs.script == 'match-named-lines'
         run: node pipeline/scripts/fetch-gnis.ts
+      - name: Fetch highway postmiles
+        if: inputs.script == 'explain-location' || inputs.script == 'match-named-lines'
+        run: node pipeline/scripts/fetch-postmiles.ts
+
       - name: Run
         env:
           EXPLAIN: ${{ inputs.sch }}
