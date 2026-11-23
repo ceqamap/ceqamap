@@ -10,7 +10,16 @@ on:
         description: 'Script in pipeline/scripts to run'
         type: choice
         options:
-          [match-intersections, profile-locations, match-landmarks, explain-location, probe-names, match-named-lines, compare-months]
+          [
+            match-intersections,
+            profile-locations,
+            match-landmarks,
+            explain-location,
+            probe-names,
+            match-named-lines,
+            compare-months,
+            sample-pages,
+          ]
         default: match-intersections
       sch:
         description: 'SCH numbers to explain, comma-separated (explain-location)'
