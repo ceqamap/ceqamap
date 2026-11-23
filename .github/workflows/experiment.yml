@@ -10,10 +10,13 @@ on:
         description: 'Script in pipeline/scripts to run'
         type: choice
         options:
-          [match-intersections, profile-locations, match-landmarks, explain-location, probe-names, match-named-lines]
+          [match-intersections, profile-locations, match-landmarks, explain-location, probe-names, match-named-lines, compare-months]
         default: match-intersections
       sch:
         description: 'SCH numbers to explain, comma-separated (explain-location)'
+        default: ''
+      months:
+        description: 'Months to refetch and compare, YYYY-MM,... (compare-months)'
         default: ''
       probe:
         description: 'Census name probes, fips:layer:regex;... (probe-names)'
@@ -71,4 +74,6 @@ jobs:
         env:
           EXPLAIN: ${{ inputs.sch }}
           PROBE: ${{ inputs.probe }}
+          MONTHS: ${{ inputs.months }}
+          CEQANET_CONTACT: ${{ vars.CEQANET_CONTACT }}
         run: node --max-old-space-size=6144 pipeline/scripts/${{ inputs.script || 'match-intersections' }}.ts
