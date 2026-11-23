@@ -70,6 +70,8 @@ export function Controls({ basemap, onBasemap, onZoomIn, onZoomOut, onReset }: P
           <ResetIcon />
         </button>
       </div>
+      {/* MapLibre's attribution control is moved in here once the map exists (MapView). */}
+      <div id="map-attribution" className="attribution-slot" />
     </div>
   );
 }

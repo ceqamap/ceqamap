@@ -12,6 +12,15 @@ body,
   height: 100%;
   margin: 0;
 }
+html,
+body {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+html {
+  background: var(--page, var(--paper)); /* set from the basemap in App */
+}
 
 body {
   font-family: var(--sans);
@@ -19,7 +28,7 @@ body {
   line-height: 1.55;
   letter-spacing: -0.011em;
   color: var(--ink);
-  background: var(--paper);
+  background: var(--page, var(--paper));
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
 }
@@ -65,13 +74,23 @@ a {
 /* ---------------------------------------------------------------- shell */
 
 .app {
-  position: fixed;
-  inset: 0;
+  /* Not position: fixed. iOS 26 Safari won't paint fixed content under its
+     floating address and tab bars; it fills them with the page background
+     instead, leaving pale strips above and below the map. Laid out in flow,
+     the app is the visible area (100% = small viewport) for the panels... */
+  position: relative;
+  height: 100%;
 }
 
 .map {
+  /* ...and the map alone runs on to the large viewport, under the browser's
+     bars where they're translucent. fitPadding() adds the hidden strip. */
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100%;
+  height: max(100%, 100lvh);
 }
 
 .card {
@@ -143,7 +162,7 @@ a {
   left: var(--gutter);
   z-index: 2;
   padding: 16px 20px 14px;
-  /* Same width as the map key below it; the subtitle's two lines fit it. */
+  /* Same width as the map key below it; the subtitle wraps naturally. */
   width: var(--panel-width);
   max-width: calc(100vw - var(--gutter) * 2 - 64px);
 }
@@ -162,6 +181,7 @@ a {
   font-size: 13.5px;
   line-height: 1.45;
   color: var(--ink-2);
+  text-wrap: pretty; /* no one-word last line */
 }
 
 .live {
@@ -285,12 +305,19 @@ a {
   top: var(--gutter);
   right: var(--gutter);
   z-index: 3;
+  /* The column is as wide as the closed (hidden) layer menu, 200px; on phones
+     that box overlaps the header card. Only the buttons and open menus take
+     taps, so the header's "N new" and time window stay reachable. */
+  pointer-events: none;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 10px;
   /* Moves with the drawer: same distance, duration and easing (see .drawer). */
   transition: transform var(--drawer-out);
+}
+.controls > * {
+  pointer-events: auto;
 }
 .drawer-open .controls {
   transform: translateX(calc(-1 * (var(--drawer-width) + var(--gutter))));
@@ -527,8 +554,30 @@ a {
   text-decoration: line-through;
   text-decoration-color: var(--line-strong);
 }
+/* First row of each list: a hint, or "Show all …" once something is hidden.
+   Fixed height, so toggling never moves the rows below it. */
+.legend-filter-row {
+  display: flex;
+  align-items: center;
+  height: 22px;
+  margin: 2px 0 2px;
+  font-size: 12.5px;
+}
+.legend-hint {
+  color: var(--faint);
+}
+/* Hidden locations: the mark fades, the label is struck through like a stage. */
+.legend-list.precision .stage-toggle.off .dot {
+  opacity: 0.35;
+}
+.legend-static {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+}
 .legend-reset {
-  margin: 6px 0 0;
+  margin: 0;
   padding: 0;
   border: 0;
   background: none;
@@ -664,6 +713,7 @@ a {
   padding: 14px 16px 10px 24px;
   border-bottom: 1px solid var(--line);
 }
+
 .icon-button {
   width: 34px;
   height: 34px;
@@ -687,7 +737,7 @@ a {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin: 0 0 14px;
+  margin: 14px 0 0; /* under the location line */
   padding: 4px 12px 4px 10px;
   border: 1px solid var(--line);
   border-radius: var(--radius-pill);
@@ -723,7 +773,7 @@ a {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 16px 0 0;
+  margin: 0 0 16px; /* first in the drawer body, above the title */
   padding: 10px 14px;
   border-radius: 12px;
   background: var(--signal-wash);
@@ -926,7 +976,8 @@ a {
 .maplibregl-ctrl-bottom-right {
   margin: 0 var(--gutter) var(--gutter) 0;
 }
-/* Attribution as a pill like the map layer button: 38px tall with its border,
+/* Desktop: credits in the bottom-right corner.
+   Attribution as a pill like the map layer button: 38px tall with its border,
    the info icon a 36px round button at its right end. Expanded, the credits
    sit inside the same pill. */
 .maplibregl-ctrl.maplibregl-ctrl-attrib.maplibregl-compact {
@@ -985,6 +1036,68 @@ a {
     width 320ms var(--ease),
     opacity 240ms ease 80ms,
     visibility 0s;
+}
+/* Phones: the credits sit in the controls column, under the zoom buttons
+   (MapView moves them there): a 42px round button, as wide as them. Open, the
+   credits drop down below it in a full-width card, like the map key, instead
+   of growing sideways across the map. MapLibre still runs the control: it
+   starts open and closes when the map is first dragged. */
+.attribution-slot {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+}
+.attribution-slot:empty {
+  display: none; /* on desktop, and before the map exists: no stray gap */
+}
+.attribution-slot .maplibregl-ctrl.maplibregl-ctrl-attrib.maplibregl-compact,
+.attribution-slot .maplibregl-ctrl.maplibregl-ctrl-attrib.maplibregl-compact-show {
+  position: relative;
+  display: block;
+  width: 42px;
+  height: 42px;
+  min-height: 0;
+  padding: 0;
+  border-radius: 50%;
+  transition: border-color 0.2s var(--ease);
+}
+.attribution-slot .maplibregl-ctrl.maplibregl-ctrl-attrib.maplibregl-compact-show {
+  border-color: var(--ink);
+}
+.attribution-slot .maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-inner {
+  position: absolute;
+  top: calc(100% + 10px); /* the controls column's gap */
+  right: -1px; /* past the button's border: right edge flush with the column */
+  box-sizing: border-box;
+  width: calc(100vw - var(--gutter) * 2);
+  padding: 10px 14px;
+  overflow: visible;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--card) 94%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-card);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: normal;
+  transform: translateY(-6px);
+  transform-origin: top right;
+  transition:
+    opacity 160ms ease,
+    transform 320ms var(--ease),
+    visibility 0s linear 320ms;
+}
+.attribution-slot .maplibregl-ctrl-attrib.maplibregl-compact-show .maplibregl-ctrl-attrib-inner {
+  transform: none;
+  transition:
+    opacity 240ms ease 40ms,
+    transform 320ms var(--ease),
+    visibility 0s;
+}
+.attribution-slot .maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-button {
+  top: 2px;
+  right: 2px;
 }
 .maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-button {
   top: 0;
@@ -1071,17 +1184,45 @@ a {
     padding-top: 8px;
     margin-top: 8px;
   }
+  /* Round, and as wide as the zoom controls and credits below it (42px). */
   .layers-button {
-    width: 40px;
+    width: 42px;
+    height: 42px;
     padding: 0;
     justify-content: center;
     font-size: 0;
     gap: 0;
   }
+  /* Collapsed: a pill along the bottom, its right edge flush with the controls
+     column above. Open: a full sheet up to the top gutter, above the header,
+     map layer button and zoom controls (which would otherwise cover the
+     collapse button). Height animates between two lengths, so it eases on
+     every browser. Its bottom stays 24px above the gutter: in-app browsers
+     (DuckDuckGo on iOS) lay the page out under their translucent toolbar. */
   .legend {
-    width: auto;
-    right: auto;
+    display: flex;
+    flex-direction: column;
+    width: calc(100% - var(--gutter) * 2);
+    height: 42px; /* 36px button + 2px inset + border, as the collapsed pill */
     bottom: calc(var(--gutter) + 24px);
+    transition:
+      border-radius 320ms var(--ease),
+      height 320ms var(--ease);
+  }
+  .legend.open {
+    z-index: 4; /* above header (2) and controls (3); below the drawer (5) */
+    height: calc(100% - var(--gutter) * 2 - 24px);
+  }
+  .legend-head {
+    flex: none;
+  }
+  .legend-reveal {
+    flex: 1;
+    min-height: 0;
+  }
+  .legend.open .legend-clip {
+    overflow-y: auto; /* short phones: the key scrolls inside the sheet */
+    overscroll-behavior: contain;
   }
   .drawer-open .controls {
     transform: none; /* the drawer is a bottom sheet here */

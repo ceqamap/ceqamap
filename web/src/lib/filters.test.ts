@@ -1,7 +1,19 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { PublishedMeta } from '../../../packages/shared/src/index.ts';
-import { ALL_STAGES, filterParams, nextStages, readScope, readStages, scopeCounts, shownCount } from './filters.ts';
+import {
+  ALL_MARKS,
+  ALL_STAGES,
+  filterParams,
+  marksSupported,
+  nextMarks,
+  nextStages,
+  readMarks,
+  readScope,
+  readStages,
+  scopeCounts,
+  shownCount,
+} from './filters.ts';
 import { cubicBezier, PING_MS, pingDelay, pingProgress } from './motion.ts';
 
 const q = (s: string) => new URLSearchParams(s);
@@ -19,8 +31,18 @@ describe('filter URL state', () => {
   });
 
   it('omits defaults when writing', () => {
-    assert.deepEqual(filterParams('12m', [...ALL_STAGES]), { t: null, stages: null });
-    assert.deepEqual(filterParams('all', ['scoping', 'in_review']), { t: 'all', stages: 'in_review,scoping' });
+    assert.deepEqual(filterParams('12m', [...ALL_STAGES]), { t: null, stages: null, marks: null });
+    assert.deepEqual(filterParams('all', ['scoping', 'in_review']), {
+      t: 'all',
+      stages: 'in_review,scoping',
+      marks: null,
+    });
+    assert.deepEqual(filterParams('12m', [...ALL_STAGES], ['approx', 'exact']).marks, 'exact,approx');
+  });
+
+  it('reads locations in legend order', () => {
+    assert.deepEqual(readMarks(q('')), ALL_MARKS);
+    assert.deepEqual(readMarks(q('marks=approx,nope,exact')), ['exact', 'approx']);
   });
 });
 
@@ -33,6 +55,13 @@ describe('legend clicks', () => {
   it('solos a stage with Alt, and a second Alt-click shows everything again', () => {
     assert.deepEqual(nextStages([...ALL_STAGES], 'scoping', true), ['scoping']);
     assert.deepEqual(nextStages(['scoping'], 'scoping', true), ALL_STAGES);
+  });
+
+  it('toggles and solos locations the same way', () => {
+    assert.deepEqual(nextMarks([...ALL_MARKS], 'intersection', false), ['exact', 'approx']);
+    assert.deepEqual(nextMarks(['approx'], 'exact', false), ['exact', 'approx']);
+    assert.deepEqual(nextMarks([...ALL_MARKS], 'approx', true), ['approx']);
+    assert.deepEqual(nextMarks(['approx'], 'approx', true), ALL_MARKS);
   });
 });
 
@@ -58,6 +87,28 @@ describe('counts', () => {
     const old = { ...meta, scopes: undefined } as PublishedMeta;
     assert.equal(shownCount(old, '12m', [...ALL_STAGES]), 200);
     assert.deepEqual(scopeCounts(old, '12m').byMark, { exact: 2, intersection: 2, approx: 5 });
+  });
+
+  it('cross-counts stages and locations when the data has both', () => {
+    const z = { exact: 0, intersection: 0, approx: 0 };
+    const byStageMark = {
+      in_review: { exact: 2, intersection: 1, approx: 2 },
+      scoping: { exact: 4, intersection: 0, approx: 6 },
+      review_closed: z,
+      approved: z,
+      exempt: z,
+      other: z,
+    };
+    const joint = {
+      ...meta,
+      scopes: { '12m': { ...meta.scopes!['12m'], byStageMark } },
+    } as unknown as PublishedMeta;
+    assert.equal(marksSupported(meta, '12m'), false);
+    assert.equal(marksSupported(joint, '12m'), true);
+    assert.equal(shownCount(joint, '12m', ['in_review', 'scoping'], ['exact']), 6);
+    const c = scopeCounts(joint, '12m', ['scoping'], ['exact', 'approx']);
+    assert.equal(c.byStatus.in_review, 4); // within the shown locations
+    assert.deepEqual(c.byMark, { exact: 4, intersection: 0, approx: 6 }); // within the shown stages
   });
 });
 

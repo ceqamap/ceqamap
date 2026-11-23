@@ -1,5 +1,12 @@
 import type { ExpressionSpecification, LayerSpecification, Map as MapLibreMap } from 'maplibre-gl';
-import { type ProjectStatus, STATUSES, stageCountKey } from '../../../packages/shared/src/index.ts';
+import {
+  type MapMark,
+  MARKS,
+  markCountKey,
+  type ProjectStatus,
+  STATUSES,
+  stageCountKey,
+} from '../../../packages/shared/src/index.ts';
 import { LABEL_FONT } from './basemaps.ts';
 
 /**
@@ -15,9 +22,11 @@ import { LABEL_FONT } from './basemaps.ts';
  *   arrivals    a hairline ring that grows and fades (the header's "ping") around
  *               projects, and clusters of projects, that arrived in the latest batch
  *
- * The legend's stage filter is applied here: points by their stage, clusters
- * by summing the per-stage counts tippecanoe accumulated (c_in_review, ...).
- * Data built before those counts existed falls back to point_count.
+ * The legend's filters are applied here: points by their stage and mark,
+ * clusters by summing the counts tippecanoe accumulated: per stage
+ * (c_in_review, ...) while every location is shown, per stage and mark
+ * (c_in_review_e, ...) once some are hidden. Data built before the per-stage
+ * counts existed falls back to point_count.
  */
 
 export const SOURCE_ID = 'projects';
@@ -38,11 +47,23 @@ export interface LayerTheme {
   mode: 'light' | 'dark';
   /** Stages the legend shows. */
   stages: readonly ProjectStatus[];
+  /** Locations (map marks) the legend shows. */
+  marks: readonly MapMark[];
 }
 
-/** Projects in a cluster that belong to the shown stages. */
-function clusterCountExpr(stages: readonly ProjectStatus[]): ExpressionSpecification {
-  const terms = stages.map((s) => ['coalesce', ['get', stageCountKey(s)], 0]);
+const ALL_MARK_IDS = MARKS.map((m) => m.id);
+const allMarks = (marks: readonly MapMark[]) => ALL_MARK_IDS.every((m) => marks.includes(m));
+
+/** Count attributes to sum for these stages and locations. */
+function countKeys(stages: readonly ProjectStatus[], marks: readonly MapMark[]): string[] {
+  return allMarks(marks)
+    ? stages.map((s) => stageCountKey(s))
+    : stages.flatMap((s) => marks.map((m) => markCountKey(s, m)));
+}
+
+/** Projects in a cluster that belong to the shown stages and locations. */
+function clusterCountExpr(stages: readonly ProjectStatus[], marks: readonly MapMark[]): ExpressionSpecification {
+  const terms = countKeys(stages, marks).map((k) => ['coalesce', ['get', k], 0]);
   return [
     'case',
     ['has', stageCountKey('in_review')],
@@ -51,29 +72,50 @@ function clusterCountExpr(stages: readonly ProjectStatus[]): ExpressionSpecifica
   ] as unknown as ExpressionSpecification;
 }
 
-/** In-review projects in a cluster, if the in-review stage is shown. */
-function clusterInReviewExpr(stages: readonly ProjectStatus[]): ExpressionSpecification | number {
+/** In-review projects in a cluster (in the shown locations), if the in-review stage is shown. */
+function clusterInReviewExpr(
+  stages: readonly ProjectStatus[],
+  marks: readonly MapMark[],
+): ExpressionSpecification | number {
   if (!stages.includes('in_review')) return 0;
+  if (!allMarks(marks)) {
+    const terms = countKeys(['in_review'], marks).map((k) => ['coalesce', ['get', k], 0]);
+    return ['+', 0, 0, ...terms] as unknown as ExpressionSpecification;
+  }
   return ['coalesce', ['get', stageCountKey('in_review')], ['get', 'r'], 0] as unknown as ExpressionSpecification;
 }
 
-function stageFilter(stages: readonly ProjectStatus[]): ExpressionSpecification {
-  return ['in', ['get', 's'], ['literal', [...stages]]] as unknown as ExpressionSpecification;
+function pointFilter(stages: readonly ProjectStatus[], marks: readonly MapMark[]): ExpressionSpecification {
+  const xs = MARKS.filter((m) => marks.includes(m.id)).map((m) => m.x);
+  return [
+    'all',
+    ['in', ['get', 's'], ['literal', [...stages]]],
+    ['in', ['get', 'x'], ['literal', xs]],
+  ] as unknown as ExpressionSpecification;
 }
 
 /** The same counts in JavaScript, for the hover card. */
-export function clusterCounts(props: Record<string, unknown>, stages: readonly ProjectStatus[]) {
+export function clusterCounts(
+  props: Record<string, unknown>,
+  stages: readonly ProjectStatus[],
+  marks: readonly MapMark[] = ALL_MARK_IDS,
+) {
   const num = (v: unknown) => (typeof v === 'number' ? v : Number(v ?? 0) || 0);
   const hasStages = props[stageCountKey('in_review')] !== undefined;
-  const count = hasStages ? stages.reduce((n, s) => n + num(props[stageCountKey(s)]), 0) : num(props.point_count);
-  const inReview = stages.includes('in_review') ? num(props[stageCountKey('in_review')] ?? props.r) : 0;
+  const sum = (keys: string[]) => keys.reduce((n, k) => n + num(props[k]), 0);
+  const count = hasStages ? sum(countKeys(stages, marks)) : num(props.point_count);
+  const inReview = !stages.includes('in_review')
+    ? 0
+    : allMarks(marks)
+      ? num(props[stageCountKey('in_review')] ?? props.r)
+      : sum(countKeys(['in_review'], marks));
   return { count, inReview, arrived: num(props.n) };
 }
 
 const clusterRadiusSteps = [11, 25, 14, 100, 18, 1000, 24, 5000, 30];
 
-function clusterRadiusExpr(stages: readonly ProjectStatus[]): ExpressionSpecification {
-  return ['step', clusterCountExpr(stages), ...clusterRadiusSteps] as unknown as ExpressionSpecification;
+function clusterRadiusExpr(stages: readonly ProjectStatus[], marks: readonly MapMark[]): ExpressionSpecification {
+  return ['step', clusterCountExpr(stages, marks), ...clusterRadiusSteps] as unknown as ExpressionSpecification;
 }
 
 /**
@@ -85,12 +127,13 @@ export function arrivalRadius(
   stages: readonly ProjectStatus[],
   progress: number,
   selectedId: string | null = null,
+  marks: readonly MapMark[] = ALL_MARK_IDS,
 ): ExpressionSpecification {
   const grow = progress * 10;
   const at = (dot: number, selectedDot: number) => [
     'case',
     ['has', 'point_count'],
-    ['+', clusterRadiusExpr(stages), 1 + grow],
+    ['+', clusterRadiusExpr(stages, marks), 1 + grow],
     // By id rather than feature-state, which this layer did not pick up
     // reliably while its radius is re-set every frame (2026-11-21).
     ['==', ['to-string', ['get', 'id']], selectedId ?? ''],
@@ -153,17 +196,17 @@ function pointRadius(base: number, scale = 1): ExpressionSpecification {
   ] as ExpressionSpecification;
 }
 
-export function projectLayers({ mode, stages }: LayerTheme): LayerSpecification[] {
+export function projectLayers({ mode, stages, marks }: LayerTheme): LayerSpecification[] {
   const surface = mode === 'light' ? '#f4f2ee' : '#121212';
   const ink = mode === 'light' ? '#151515' : '#efede8';
   const card = mode === 'light' ? '#faf9f6' : '#1a1a1a';
   const color = statusColor(mode);
   const green = STATUSES[0][mode];
-  const count = clusterCountExpr(stages);
-  const inReview = clusterInReviewExpr(stages);
+  const count = clusterCountExpr(stages, marks);
+  const inReview = clusterInReviewExpr(stages, marks);
   const clusterFilter = ['all', isCluster, ['>', count, 0]] as unknown as ExpressionSpecification;
   const hasOpenReview = ['>', inReview, 0] as unknown as ExpressionSpecification;
-  const shown = stageFilter(stages);
+  const shown = pointFilter(stages, marks);
 
   return [
     {
@@ -175,7 +218,7 @@ export function projectLayers({ mode, stages }: LayerTheme): LayerSpecification[
       paint: {
         'circle-color': card,
         'circle-opacity': 0.92,
-        'circle-radius': clusterRadiusExpr(stages),
+        'circle-radius': clusterRadiusExpr(stages, marks),
         'circle-stroke-color': ['case', hasOpenReview, green, ink],
         'circle-stroke-width': ['case', hasOpenReview, 2, 0.75],
       },
@@ -289,7 +332,7 @@ export function projectLayers({ mode, stages }: LayerTheme): LayerSpecification[
         ['any', clusterFilter, ['all', notCluster, shown]],
       ] as unknown as ExpressionSpecification,
       paint: {
-        'circle-radius': arrivalRadius(stages, 0.45),
+        'circle-radius': arrivalRadius(stages, 0.45, null, marks),
         'circle-color': 'rgba(0, 0, 0, 0)',
         'circle-stroke-color': green,
         'circle-stroke-width': 1.25,
@@ -305,7 +348,7 @@ const ANIMATED: Record<string, string[]> = {
   [LAYER.arrivals]: ['circle-stroke-opacity'],
 };
 
-/** Apply a new stage selection to layers already on the map, without reloading tiles. */
+/** Apply a new stage or location selection to layers already on the map, without reloading tiles. */
 export function applyStages(map: MapLibreMap, theme: LayerTheme) {
   for (const layer of projectLayers(theme)) {
     if (!map.getLayer(layer.id) || !('filter' in layer)) continue;
