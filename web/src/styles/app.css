@@ -679,7 +679,6 @@ a {
 /* --------------------------------------------------------------- drawer */
 
 .drawer {
-  container: drawer / inline-size; /* the top bar adapts to its width */
   position: absolute;
   z-index: 5;
   top: var(--gutter);
@@ -707,51 +706,14 @@ a {
     visibility 0s;
 }
 
-/* Top bar: status pill, SCH number and close button. One row on desktop
-   drawers (pill, number at the right next to close); on narrower drawers
-   (phones) the number and close button share the first row and the pill gets
-   its own, so a long status and date never crowd the close button. */
 .drawer-bar {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  grid-template-areas: 'pill id close';
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  column-gap: 12px;
-  row-gap: 10px;
-  padding: 14px 16px 12px 24px;
+  padding: 14px 16px 10px 24px;
   border-bottom: 1px solid var(--line);
 }
-.drawer-bar .status-chip {
-  grid-area: pill;
-  justify-self: start;
-  box-sizing: border-box;
-  height: 34px;
-  margin: 0;
-  white-space: nowrap;
-}
-.drawer-id {
-  grid-area: id;
-  text-align: right;
-  white-space: nowrap;
-}
-.drawer-bar .icon-button {
-  grid-area: close;
-}
-@container drawer (max-width: 419px) {
-  .drawer-bar {
-    grid-template-columns: 1fr auto;
-    grid-template-areas:
-      'id close'
-      'pill pill';
-  }
-  .drawer-id {
-    text-align: left;
-  }
-}
 
-.nowrap {
-  white-space: nowrap;
-}
 .icon-button {
   width: 34px;
   height: 34px;
@@ -775,7 +737,7 @@ a {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin: 0 0 14px;
+  margin: 14px 0 0; /* under the location line */
   padding: 4px 12px 4px 10px;
   border: 1px solid var(--line);
   border-radius: var(--radius-pill);
