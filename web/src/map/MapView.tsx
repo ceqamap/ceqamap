@@ -156,8 +156,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
 
       map.on('mousemove', (e) => {
         const f = map!.queryRenderedFeatures(e.point, { layers: INTERACTIVE_LAYERS })[0] as
-          | MapGeoJSONFeature
-          | undefined;
+          MapGeoJSONFeature | undefined;
         setHovered(map!, f && !f.properties.point_count ? String(f.properties.id) : null);
         map!.getCanvas().style.cursor = f ? 'pointer' : '';
         if (!f) return latest.current.onHover(null);
@@ -184,8 +183,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
 
       map.on('click', (e) => {
         const f = map!.queryRenderedFeatures(e.point, { layers: INTERACTIVE_LAYERS })[0] as
-          | MapGeoJSONFeature
-          | undefined;
+          MapGeoJSONFeature | undefined;
         if (!f) return latest.current.onSelect(null);
         if (f.properties.point_count) {
           const [lon, lat] = (f.geometry as { coordinates: [number, number] }).coordinates;
