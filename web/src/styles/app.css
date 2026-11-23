@@ -942,82 +942,79 @@ a {
   font-family: var(--sans);
   font-size: 11px;
 }
-/* The credits sit in the controls column, under the zoom buttons and as wide
-   as them (42px). Open, they grow to the left and scroll sideways if the
-   window is too narrow for them. */
+/* The credits sit in the controls column, under the zoom buttons: a 42px
+   round button, as wide as them, with an ink "i". Open, the credits drop down
+   below it in a card, like the map layer menu does, instead of growing
+   sideways across the map. The "i" turns into an "x". MapLibre still runs the
+   control: it starts open and closes when the map is first dragged. */
 .attribution-slot {
+  position: relative;
   display: flex;
   justify-content: flex-end;
-  max-width: calc(100vw - var(--gutter) * 2);
 }
 .attribution-slot:empty {
   display: none; /* before the map exists, so the column has no stray gap */
 }
-.attribution-slot .maplibregl-ctrl-attrib.maplibregl-compact {
-  max-width: 100%;
-}
-.attribution-slot .maplibregl-compact-show .maplibregl-ctrl-attrib-inner {
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-/* Attribution as a pill as wide as the zoom controls: 42px with its border, the
-   info icon a 36px round button inset 2px at its right end, like the zoom
-   buttons in their group. Expanded, the credits sit inside the same pill. */
 .maplibregl-ctrl.maplibregl-ctrl-attrib.maplibregl-compact {
-  display: flex;
-  align-items: center;
+  position: relative;
   box-sizing: border-box;
-  min-height: 42px;
+  width: 42px;
+  height: 42px;
+  min-height: 0;
   margin: 0;
-  padding: 0 40px 0 0;
+  padding: 0;
   border: 1px solid var(--line-strong);
-  border-radius: var(--radius-pill);
+  border-radius: 50%;
   background: color-mix(in srgb, var(--card) 94%, transparent);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   box-shadow: var(--shadow-card);
   color: var(--ink-2);
+  transition: border-color 0.2s var(--ease);
 }
-.maplibregl-ctrl.maplibregl-ctrl-attrib.maplibregl-compact:hover {
+.maplibregl-ctrl.maplibregl-ctrl-attrib.maplibregl-compact:hover,
+.maplibregl-ctrl.maplibregl-ctrl-attrib.maplibregl-compact-show {
   border-color: var(--ink);
 }
-.maplibregl-ctrl.maplibregl-ctrl-attrib.maplibregl-compact {
-  /* Open and close like the map key and layer menu: same duration and curve. */
-  interpolate-size: allow-keywords;
-  transition:
-    padding 320ms var(--ease),
-    border-color 0.2s var(--ease);
-}
-.maplibregl-ctrl.maplibregl-ctrl-attrib.maplibregl-compact-show {
-  /* Right: the inset 36px button plus an 8px gap, so the credits never touch
-     the button's hover circle. */
-  padding: 0 calc(2px + 36px + 8px) 0 14px;
-}
-/* The credits stay rendered so they can slide open: width 0 -> auto (browsers
-   without interpolate-size or ::details-content simply show them at once),
-   fading in after they start to open and out before they close. */
+/* Rendered while closed too, so the card can fade and slide. */
 .maplibregl-ctrl-attrib.maplibregl-compact::details-content {
   content-visibility: visible;
 }
 .maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-inner {
+  position: absolute;
+  top: calc(100% + 10px); /* the controls column's gap */
+  right: -1px; /* past the button's border: right edge flush with the column */
   display: block;
-  width: 0;
-  overflow: hidden;
-  white-space: nowrap;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: min(260px, calc(100vw - var(--gutter) * 2));
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--card) 94%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-card);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: normal;
+  text-align: right;
   opacity: 0;
   visibility: hidden;
+  transform: translateY(-6px);
+  transform-origin: top right;
   transition:
-    width 320ms var(--ease),
     opacity 160ms ease,
+    transform 320ms var(--ease),
     visibility 0s linear 320ms;
 }
 .maplibregl-ctrl-attrib.maplibregl-compact-show .maplibregl-ctrl-attrib-inner {
-  width: auto;
   opacity: 1;
   visibility: visible;
+  transform: none;
   transition:
-    width 320ms var(--ease),
-    opacity 240ms ease 80ms,
+    opacity 240ms ease 40ms,
+    transform 320ms var(--ease),
     visibility 0s;
 }
 .maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-button {
@@ -1118,21 +1115,21 @@ a {
      column above. Open: a full sheet up to the top gutter, above the header,
      map layer button and zoom controls (which would otherwise cover the
      collapse button). Height animates between two lengths, so it eases on
-     every browser. The credits moved up under the zoom controls, so the key
-     sits on the bottom gutter. */
+     every browser. Its bottom stays 24px above the gutter: in-app browsers
+     (DuckDuckGo on iOS) lay the page out under their translucent toolbar. */
   .legend {
     display: flex;
     flex-direction: column;
     width: calc(100% - var(--gutter) * 2);
     height: 42px; /* 36px button + 2px inset + border, as the collapsed pill */
-    bottom: var(--gutter);
+    bottom: calc(var(--gutter) + 24px);
     transition:
       border-radius 320ms var(--ease),
       height 320ms var(--ease);
   }
   .legend.open {
     z-index: 4; /* above header (2) and controls (3); below the drawer (5) */
-    height: calc(100% - var(--gutter) * 2);
+    height: calc(100% - var(--gutter) * 2 - 24px);
   }
   .legend-head {
     flex: none;
