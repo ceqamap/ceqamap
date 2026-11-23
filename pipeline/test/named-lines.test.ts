@@ -230,3 +230,55 @@ describe('postmiles', () => {
     assert.equal(placeAtPostmiles('Parcel map PM 11.2', ['San Diego'], table).kind, 'none');
   });
 });
+
+describe('resolveLines: tributaries and repeats', () => {
+  const county = toArea('County', [rect(-124, 39, -122, 41)])!;
+  const area = { city: null, county };
+  const keys = (names: string[]) => new Set(names.flatMap((n) => [streetKeys(n)!.full, streetKeys(n)!.nodir]));
+  const base: LineRequest = {
+    sch: '2004088511',
+    roads: [],
+    waters: [],
+    crossingWord: false,
+    places: [],
+    city: null,
+    counties: ['county'],
+  };
+
+  it('places a creek named as a tributary along the stretch that reaches the river, not at the mouth', () => {
+    // Two "Tramp Creek"s; the one in two segments flows into the river at (-123.1, 39.8).
+    const water = [
+      line('Tramp Crk', 'H3010', [-123.15, 39.85], [-123.12, 39.82]),
+      line('Tramp Crk', 'H3010', [-123.12, 39.82], [-123.1, 39.8]),
+      line('Tramp Crk', 'H3010', [-122.5, 40.5], [-122.45, 40.5]),
+      line('Middle Fork Eel Riv', 'H3010', [-123.2, 39.8], [-123.0, 39.8]),
+    ];
+    const r = resolveLines(
+      { ...base, waters: ['Tramp Creek', 'Middle Fork Eel River'], crossingWord: true },
+      area,
+      buildRoadIndex([], new Set()),
+      buildRoadIndex(water, keys(['Tramp Creek', 'Middle Fork Eel River'])),
+      () => buildRoadGrid([]),
+    );
+    assert.ok(r.ok);
+    assert.equal(r.placement.kind, 'along');
+    assert.ok(r.placement.lon < -123.09 && r.placement.lon > -123.16, `${r.placement.lon}`);
+  });
+
+  it('does not pair a street with itself written two ways', () => {
+    const roads = [
+      line('Central Ave', 'S1400', [-123.0, 40.0], [-123.0, 40.02]),
+      line('7th St', 'S1400', [-123.01, 40.01], [-122.99, 40.01]),
+    ];
+    const r = resolveLines(
+      { ...base, roads: ['CENTRAL', 'CENTRAL AVENUE', '7TH STREET'] },
+      area,
+      buildRoadIndex(roads, keys(['CENTRAL', 'CENTRAL AVENUE', '7TH STREET'])),
+      null,
+      () => buildRoadGrid(roads),
+    );
+    assert.ok(r.ok);
+    assert.equal(r.placement.kind, 'crossing');
+    assert.deepEqual(r.placement.kind === 'crossing' && r.placement.names, ['CENTRAL', '7TH STREET']);
+  });
+});

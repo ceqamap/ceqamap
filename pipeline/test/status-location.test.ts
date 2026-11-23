@@ -340,8 +340,9 @@ describe('resolveLocation', () => {
   });
 
   it('spreads consecutive SCH numbers apart instead of along a curve', () => {
-    const pts = Array.from({ length: 300 }, (_, i) =>
-      resolveLocation(`2026${String(i).padStart(6, '0')}`, [doc({ cities: ['Los Angeles'] })], B)!,
+    const pts = Array.from(
+      { length: 300 },
+      (_, i) => resolveLocation(`2026${String(i).padStart(6, '0')}`, [doc({ cities: ['Los Angeles'] })], B)!,
     );
     // Neighbors in SCH order should be about as far apart as random pairs, not adjacent.
     const step = pts.slice(1).map((p, i) => haversineKm(p, pts[i]));

@@ -12,7 +12,10 @@
  *
  *   1. crossing   Two named lines that meet in one place inside the listed
  *                 city or county ("State Route 76" and "Melrose Drive";
- *                 "Eel River" and "Dyerville Loop Road").
+ *                 "Brickyard Creek" and "Jackson Street"). Two waterways
+ *                 meeting don't count: "Tramp Creek, tributary to the Middle
+ *                 Fork Eel River" is about the creek, not its mouth; the
+ *                 river only tells which Tramp Creek (see step 4).
  *   2. place      A place name with several same-name places in the county
  *                 (two "Emigrant Pass" in Inyo County) settled by a named
  *                 road: the one place within NEAR_LINE_KM of it.
@@ -20,7 +23,9 @@
  *                 with no road named: where the waterway crosses a public
  *                 road, if every such crossing in the area is one place.
  *   4. along      Exactly one named line, short inside the area (see
- *                 placeAlongLines): a spot along it. Still approximate.
+ *                 placeAlongLines): a spot along it. Still approximate. A
+ *                 creek named as a tributary of another named waterway counts
+ *                 as one line: the stretch of that creek that flows into it.
  *
  * Text names are strict: Title Case (or all-caps text) words ending in a
  * street or water type ("Melrose Drive", "Quiota Creek"), numbered routes
@@ -35,6 +40,7 @@ import {
   type Line,
   lineBBox,
   linesFor,
+  nearMeetings,
   placeAlongLines,
   pointSegmentKm,
   type RoadIndex,
@@ -134,7 +140,7 @@ const STOP = new Set([
 const MAX_NAME_WORDS = 3;
 const MAX_NAMES = 6;
 /** A named road settles a same-name place within this distance... */
-export const NEAR_LINE_KM = 15;
+export const NEAR_LINE_KM = 20;
 /** ...when every other same-name place is at least this far from the named roads. */
 const OTHERS_FAR_KM = 40;
 /** Road crossings of a named waterway within this spread count as one place (its middle crossing is used). */
@@ -373,13 +379,23 @@ export function resolveLines(
   // Keep only the parts of each line in (or near) the area, so a creek or
   // road of the same name elsewhere in the county doesn't count.
   for (const n of named) if (n.lines) n.lines = clipToArea(n.lines, area);
-  const found = named.filter((n) => n.lines && n.lines.length > 0);
+  // One street written two ways ("CENTRAL" in cross streets, "Central Avenue" in the text) is one line.
+  const bases = new Set<string>();
+  const found = named.filter((n) => {
+    if (!n.lines || n.lines.length === 0) return false;
+    const base = streetKeys(n.name)?.base ?? n.name;
+    if (bases.has(base)) return false;
+    bases.add(base);
+    return true;
+  });
+  const isWater = (n: { name: string }) => r.waters.includes(n.name);
 
-  // 1. Two named lines that meet.
+  // 1. Two named lines that meet (not two waterways: see above).
   if (found.length >= 2) {
     const m = firstMeeting(
       found.map((n) => n.lines),
       area,
+      (i, j) => !(isWater(found[i]) && isWater(found[j])),
     );
     if (m.ok)
       return {
@@ -402,10 +418,13 @@ export function resolveLines(
     }
   }
 
+  // A creek and the waterway it flows into: just the stretch of the creek that reaches it.
+  const tributary = tributaryOf(found.filter(isWater));
+  const subject = tributary && found.every((n) => isWater(n)) ? [tributary] : found;
+
   // 3. A named waterway with a crossing, bridge or culvert, and no road named or found.
-  const waters = found.filter((n) => r.waters.includes(n.name));
-  if (r.crossingWord && waters.length === 1 && found.length === 1) {
-    const w = waters[0];
+  if (r.crossingWord && subject.length === 1 && isWater(subject[0])) {
+    const w = subject[0];
     const near = roadsNear(grid(), w.lines!);
     const points: { lon: number; lat: number; road: string }[] = [];
     for (const e of near) for (const p of crossings(w.lines!, [e.line])) points.push({ ...p, road: e.name });
@@ -428,12 +447,48 @@ export function resolveLines(
   }
 
   // 4. Exactly one named line: a spot along it, if it's short in the area.
-  if (found.length === 1) {
-    const res = placeAlongLines(found[0].lines!, area, r.sch);
-    if (res.ok) return { ok: true, placement: { kind: 'along', lon: res.lon, lat: res.lat, names: [found[0].name] } };
+  if (subject.length === 1) {
+    const res = placeAlongLines(subject[0].lines!, area, r.sch);
+    if (res.ok) return { ok: true, placement: { kind: 'along', lon: res.lon, lat: res.lat, names: [subject[0].name] } };
     return { ok: false, reason: `one-line:${res.reason}` };
   }
   return { ok: false, reason: found.length === 0 ? 'not-found' : 'no-meeting' };
+}
+
+/**
+ * "Tramp Creek, tributary to the Middle Fork Eel River": the first waterway,
+ * cut down to its connected stretch that touches a later one. Many creeks in
+ * a county share a name ("Mill Creek"); the one flowing into the named river
+ * is meant. Null if the first doesn't reach any later one.
+ */
+function tributaryOf(waters: { name: string; lines: Line[] | null }[]): { name: string; lines: Line[] } | null {
+  if (waters.length < 2) return null;
+  const [first, ...rest] = waters;
+  const others = rest.flatMap((w) => w.lines!);
+  const lines = first.lines!;
+  const touching = lines.filter((l) => crossings([l], others).length > 0 || nearMeetings([l], others).length > 0);
+  if (touching.length === 0) return null;
+  // Grow the stretch along lines that share an end point (TIGER segments join end to end).
+  const key = (p: [number, number]) => `${p[0].toFixed(5)},${p[1].toFixed(5)}`;
+  const byEnd = new Map<string, Line[]>();
+  for (const l of lines)
+    for (const e of [l.coords[0], l.coords[l.coords.length - 1]]) {
+      const list = byEnd.get(key(e));
+      if (list) list.push(l);
+      else byEnd.set(key(e), [l]);
+    }
+  const component = new Set(touching);
+  const queue = [...touching];
+  while (queue.length > 0) {
+    const l = queue.pop()!;
+    for (const e of [l.coords[0], l.coords[l.coords.length - 1]])
+      for (const m of byEnd.get(key(e)) ?? [])
+        if (!component.has(m)) {
+          component.add(m);
+          queue.push(m);
+        }
+  }
+  return { name: first.name, lines: [...component] };
 }
 
 /** The lines (whole features) that come within the area: the city (15 km slack) or the county. */

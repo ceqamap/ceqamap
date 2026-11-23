@@ -224,13 +224,14 @@ export type MeetingResult =
 export function firstMeeting(
   lines: readonly (Line[] | null)[],
   area: { city?: Area | null; county?: Area | null },
+  pairAllowed: (i: number, j: number) => boolean = () => true,
 ): MeetingResult {
   let sawCrossing = false;
   let sawOutside = false;
   let sawAmbiguous = false;
   for (let i = 0; i < lines.length; i++) {
     for (let j = i + 1; j < lines.length; j++) {
-      if (!lines[i] || !lines[j]) continue;
+      if (!lines[i] || !lines[j] || !pairAllowed(i, j)) continue;
       let points = crossings(lines[i]!, lines[j]!);
       if (points.length === 0) points = nearMeetings(lines[i]!, lines[j]!);
       if (points.length === 0) continue;
