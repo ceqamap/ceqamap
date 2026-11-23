@@ -45,12 +45,7 @@ export function Header({ meta, status, scope, stages, marks, onScope, arrivalInd
   return (
     <header className="header card">
       <h1 className="wordmark">CEQA Map</h1>
-      <p className="header-sub">
-        {/* Two deliberate lines, so the card can shrink to fit them (see .header). */}
-        Every project filed with California’s
-        <br />
-        State Clearinghouse, on one map.
-      </p>
+      <p className="header-sub">Every California environmental review, on one map.</p>
       <div className="live" aria-live="polite">
         {status && !meta ? (
           <>

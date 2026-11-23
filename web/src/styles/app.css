@@ -162,7 +162,7 @@ a {
   left: var(--gutter);
   z-index: 2;
   padding: 16px 20px 14px;
-  /* Same width as the map key below it; the subtitle's two lines fit it. */
+  /* Same width as the map key below it; the subtitle wraps naturally. */
   width: var(--panel-width);
   max-width: calc(100vw - var(--gutter) * 2 - 64px);
 }
@@ -181,6 +181,7 @@ a {
   font-size: 13.5px;
   line-height: 1.45;
   color: var(--ink-2);
+  text-wrap: pretty; /* no one-word last line */
 }
 
 .live {

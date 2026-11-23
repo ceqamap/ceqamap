@@ -142,6 +142,20 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       // then moved between the two as the window crosses the breakpoint.
       map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
       const credits = map.getContainer().querySelector('.maplibregl-ctrl-attrib');
+      // MapLibre opens compact credits when it first makes them compact; start
+      // them closed (the "i") instead. It doesn't reopen them after that.
+      if (credits) {
+        const collapse = () => {
+          if (!credits.classList.contains('maplibregl-compact')) return false;
+          credits.classList.remove('maplibregl-compact-show');
+          credits.removeAttribute('open');
+          return true;
+        };
+        if (!collapse()) {
+          const watch = new MutationObserver(() => collapse() && watch.disconnect());
+          watch.observe(credits, { attributes: true, attributeFilter: ['class'] });
+        }
+      }
       const corner = credits?.parentElement;
       const phone = window.matchMedia('(max-width: 719px)');
       const placeCredits = () => {
