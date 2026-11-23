@@ -19,15 +19,20 @@ interface Feature {
   geometry?: { x: number; y: number };
 }
 
-async function query(
-  params: Record<string, string>,
-): Promise<{ features?: Feature[]; count?: number; exceededTransferLimit?: boolean; error?: unknown }> {
+interface QueryResult {
+  features?: Feature[];
+  count?: number;
+  exceededTransferLimit?: boolean;
+  error?: unknown;
+}
+
+async function query(params: Record<string, string>): Promise<QueryResult> {
   const url = `${LAYER}/query?${new URLSearchParams({ f: 'json', ...params })}`;
   for (let attempt = 1; ; attempt++) {
     try {
       const res = await fetch(url);
       if (!res.ok) throw new Error(`${res.status}`);
-      const json = await res.json();
+      const json = (await res.json()) as QueryResult;
       if (json.error) throw new Error(JSON.stringify(json.error));
       return json;
     } catch (e) {

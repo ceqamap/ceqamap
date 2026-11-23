@@ -313,7 +313,6 @@ export interface RoadGrid {
   cells: Map<string, { line: Line; name: string }[]>;
 }
 const CELL_DEG = 0.05;
-const cellKey = (x: number, y: number) => `${Math.floor(x / CELL_DEG)}:${Math.floor(y / CELL_DEG)}`;
 
 export function buildRoadGrid(features: Iterable<ShapefileFeature>): RoadGrid {
   const cells = new Map<string, { line: Line; name: string }[]>();

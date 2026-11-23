@@ -254,8 +254,7 @@ export interface AmbiguousPlace {
 }
 
 export type LandmarkOutcome = (
-  | { kind: 'placed'; placement: LandmarkPlacement }
-  | { kind: 'none' | 'ambiguous' | 'multi-site' | 'far-from-city' }
+  { kind: 'placed'; placement: LandmarkPlacement } | { kind: 'none' | 'ambiguous' | 'multi-site' | 'far-from-city' }
 ) & { ambiguous?: AmbiguousPlace[] };
 
 export interface LandmarkContext {
