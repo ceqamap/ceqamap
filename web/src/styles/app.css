@@ -1078,10 +1078,39 @@ a {
     font-size: 0;
     gap: 0;
   }
+  /* Collapsed: the pill, bottom left. Open: a full sheet from the pill's
+     bottom edge to the top gutter, above the header, map layer button and
+     zoom controls (which would otherwise cover the collapse button). Height
+     animates between two lengths, so it eases on every browser; width eases
+     where interpolate-size is supported and snaps elsewhere. */
   .legend {
-    width: auto;
-    right: auto;
+    display: flex;
+    flex-direction: column;
+    width: fit-content;
+    max-width: calc(100% - var(--gutter) * 2);
+    height: 42px; /* 36px button + 2px inset + border, as the collapsed pill */
     bottom: calc(var(--gutter) + 24px);
+    interpolate-size: allow-keywords;
+    transition:
+      border-radius 320ms var(--ease),
+      height 320ms var(--ease),
+      width 320ms var(--ease);
+  }
+  .legend.open {
+    z-index: 4; /* above header (2) and controls (3); below the drawer (5) */
+    width: calc(100% - var(--gutter) * 2);
+    height: calc(100% - var(--gutter) * 2 - 24px);
+  }
+  .legend-head {
+    flex: none;
+  }
+  .legend-reveal {
+    flex: 1;
+    min-height: 0;
+  }
+  .legend.open .legend-clip {
+    overflow-y: auto; /* short phones: the key scrolls inside the sheet */
+    overscroll-behavior: contain;
   }
   .drawer-open .controls {
     transform: none; /* the drawer is a bottom sheet here */
