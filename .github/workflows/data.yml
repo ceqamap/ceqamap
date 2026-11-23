@@ -81,14 +81,25 @@ jobs:
 
       - name: Decide whether to rebuild
         id: decide
+        env:
+          DATA_URL: ${{ vars.DATA_URL }}
         run: |
-          # Rebuild if documents changed, on a manual force or backfill, or on the
-          # first scheduled run of the day (00:17 UTC) so statuses roll over.
+          # Rebuild if documents changed, on a manual force or backfill, or when
+          # the published data is 20+ hours old, so statuses roll over and new
+          # code reaches production daily. (GitHub runs this schedule late and
+          # only a few times a day, so a fixed hour of day can't be relied on.)
+          built=$(curl -fsS --max-time 20 "$DATA_URL/meta.json" 2>/dev/null \
+            | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).builtAt||"")}catch{}})' || true)
+          age_h=999
+          if [ -n "$built" ]; then
+            age_h=$(( ( $(date -u +%s) - $(date -u -d "$built" +%s) ) / 3600 ))
+          fi
+          echo "Published data built at ${built:-unknown} (${age_h} h ago)"
           if [ "${{ steps.ingest.outputs.changed }}" = "true" ] \
              || [ "${{ inputs.force_build }}" = "true" ] \
              || [ "${{ inputs.mode }}" = "backfill" ] \
              || [ "${{ inputs.target }}" = "preview" ] \
-             || [ "$(date -u +%H)" = "00" ]; then
+             || [ "$age_h" -ge 20 ]; then
             echo "build=true" >> "$GITHUB_OUTPUT"
           else
             echo "build=false" >> "$GITHUB_OUTPUT"
