@@ -25,6 +25,9 @@ const empty = (v: unknown) => (Array.isArray(v) ? v.length === 0 : !v);
 for (const month of MONTHS) {
   const { start, end } = monthBounds(month);
   const res = await client.fetchRange(start, end);
+  for (const r of res.records)
+    if (EXPLAIN.has(String(r['SCH Number'] ?? '').trim()))
+      out({ month, raw: Object.fromEntries(Object.entries(r).filter(([, v]) => v && String(v).trim())) });
   const fresh = res.records.map(normalizeRecord).filter((d): d is CeqaDocument => d !== null);
   const stored = await readPartition(storage, month);
   const storedByKey = new Map(stored.map((d) => [d.key, d]));
