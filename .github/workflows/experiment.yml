@@ -19,6 +19,7 @@ on:
             match-named-lines,
             compare-months,
             sample-pages,
+            fetch-pages,
           ]
         default: match-intersections
       sch:
