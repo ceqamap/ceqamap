@@ -103,6 +103,7 @@ export function buildProject(
           ...(loc.streets ? { streets: loc.streets } : {}),
           ...(loc.address ? { address: loc.address } : {}),
           ...(loc.landmark ? { landmark: loc.landmark } : {}),
+          ...(loc.postmile ? { postmile: loc.postmile } : {}),
         }
       : null,
     facts: {
@@ -135,6 +136,8 @@ export interface Placements {
   crossStreets?: ReadonlyMap<string, CrossStreetPlacement>;
   addresses?: ReadonlyMap<string, AddressPlacement>;
   landmarks?: ReadonlyMap<string, NonNullable<LocationHints['landmark']>>;
+  postmiles?: ReadonlyMap<string, NonNullable<LocationHints['postmile']>>;
+  lines?: ReadonlyMap<string, NonNullable<LocationHints['lines']>>;
 }
 
 export function aggregate(
@@ -155,6 +158,8 @@ export function aggregate(
     exact: 0,
     address: 0,
     intersection: 0,
+    postmile: 0,
+    crossing: 0,
     landmark: 0,
     street: 0,
     community: 0,
@@ -174,6 +179,8 @@ export function aggregate(
       crossStreets: placements.crossStreets?.get(sch),
       address: placements.addresses?.get(sch),
       landmark: placements.landmarks?.get(sch),
+      postmile: placements.postmiles?.get(sch),
+      lines: placements.lines?.get(sch),
     });
     projects.push(p);
     byStatus[p.status]++;

@@ -98,14 +98,27 @@ export const STATUS_BY_ID: Readonly<Record<ProjectStatus, StatusDefinition>> = O
  * lead agency entered; everything else is a best-effort placement.
  */
 export type LocationPrecision =
-  'exact' | 'address' | 'intersection' | 'landmark' | 'street' | 'community' | 'zip' | 'city' | 'county' | 'region';
+  | 'exact'
+  | 'address'
+  | 'intersection'
+  | 'postmile'
+  | 'crossing'
+  | 'landmark'
+  | 'street'
+  | 'community'
+  | 'zip'
+  | 'city'
+  | 'county'
+  | 'region';
 
 export const PRECISION_LABEL: Readonly<Record<LocationPrecision, string>> = {
   exact: 'Coordinates provided by the lead agency',
   address: 'At the street address in the project description',
   intersection: 'Near the listed cross streets',
+  postmile: 'At the highway postmiles in the project description',
+  crossing: 'Where roads or waterways named in the project description cross',
   landmark: 'Near a place named in the project description',
-  street: 'Approximate: placed along the listed street',
+  street: 'Approximate: placed along a street or waterway the project names',
   community: 'Approximate: placed at the community named in the project description',
   zip: 'Approximate: placed within the listed ZIP code',
   city: 'Approximate: placed within the listed city',
@@ -118,6 +131,8 @@ export const PRECISION_MARK: Readonly<Record<LocationPrecision, 0 | 1 | 2>> = {
   exact: 1,
   address: 1,
   intersection: 2,
+  postmile: 2,
+  crossing: 2,
   landmark: 2,
   street: 0,
   community: 0,
@@ -229,8 +244,14 @@ export interface PublishedProject {
     zip: string | null;
     /** The agency's coordinates contradicted the listed county and were not used. */
     coordinatesRejected: boolean;
-    /** For `intersection`: the two listed streets whose meeting point was used; for `street`, the one street. */
+    /**
+     * For `intersection`: the two listed streets whose meeting point was used;
+     * for `crossing`: the two roads or waterways (e.g. "Quiota Creek", "N Refugio Rd");
+     * for `street`: the one street or waterway.
+     */
     streets?: string[];
+    /** For `postmile`: the route and postmiles used, e.g. "SR 76, PM R16.4–R16.9". */
+    postmile?: string;
     /** For `address`: the address that was geocoded, e.g. "1234 Main St, Fresno". */
     address?: string;
     /** For `landmark` and `community`: the named place used (USGS GNIS), e.g. "Shelter Island". */
@@ -336,7 +357,7 @@ export interface TilePointProperties {
   t: string;
   /** Status id. */
   s: ProjectStatus;
-  /** Mark: 1 = exact, 2 = near the listed cross streets or a named place, 0 = approximate (see PRECISION_MARK). */
+  /** Mark: 1 = exact, 2 = near a named location (cross streets, postmiles, crossings, places), 0 = approximate (see PRECISION_MARK). */
   x: 0 | 1 | 2;
   /** 1 if in review (summed by clustering). */
   r: 0 | 1;

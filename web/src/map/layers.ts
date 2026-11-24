@@ -15,7 +15,8 @@ import { LABEL_FONT } from './basemaps.ts';
  * Encoding (see docs/DESIGN.md):
  *   color       CEQA stage (validated categorical palette, light and dark sets)
  *   fill        solid = coordinates from the agency; solid with a lighter center =
- *               near the listed cross streets; hollow ring = approximate
+ *               near a named location (cross streets, postmiles, crossings,
+ *               places); hollow ring = approximate
  *   clusters    hairline circles sized by count, echoing the reference site's
  *               node graph; a green ring means at least one project inside is
  *               in public review right now

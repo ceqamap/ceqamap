@@ -19,15 +19,19 @@ import { seededRandom } from './random.ts';
  *   2. A street address written in the project's text, geocoded by the
  *      Census and checked against the listed places (see geocode.ts).
  *   3. Where the listed cross streets meet (see crossStreets.ts).
- *   4. A place the project's text names: a beach, island, point, summit,
- *      spring, military site (see landmarks.ts).
- *   5. When only one street is listed, a seeded spot along it.
- *   6. A community the project's text names (see landmarks.ts).
- *   7. A random spot inside the listed ZIP code, where it overlaps the
+ *   4. The state highway postmiles in the project's text (see postmiles.ts).
+ *   5. Where two roads or waterways the text names cross (see namedLines.ts).
+ *   6. A place the project's text names: a beach, island, point, summit,
+ *      spring, military site (see landmarks.ts), or one of several
+ *      same-name places that a named road points to (see namedLines.ts).
+ *   7. When only one street is listed, or the text names one short road or
+ *      waterway, a seeded spot along it.
+ *   8. A community the project's text names (see landmarks.ts).
+ *   9. A random spot inside the listed ZIP code, where it overlaps the
  *      listed city (or county), when the ZIP area is smaller than the city.
- *   8. A random spot inside the listed city (or 2–3 nearby cities).
- *   9. A random spot inside the listed county (or 2–3 nearby counties).
- *  10. Nothing: statewide and multi-region projects are not mapped.
+ *  10. A random spot inside the listed city (or 2–3 nearby cities).
+ *  11. A random spot inside the listed county (or 2–3 nearby counties).
+ *  12. Nothing: statewide and multi-region projects are not mapped.
  *
  * "Random" is seeded by the SCH number, so a project lands in the same spot
  * on every rebuild, and spots are drawn inside the real Census outline, which
@@ -49,6 +53,8 @@ export interface ResolvedLocation {
   address?: string;
   /** For `landmark` and `community`: the named place used. */
   landmark?: string;
+  /** For `postmile`: route and postmiles, e.g. "SR 76, PM R16.4–R16.9". */
+  postmile?: string;
 }
 
 export interface AddressPlacement {
@@ -65,6 +71,10 @@ export interface LocationHints {
   address?: AddressPlacement;
   /** A named place from the project's text, already checked against the listed places (see landmarks.ts). */
   landmark?: { lon: number; lat: number; name: string; rank: 1 | 2 | 3 };
+  /** State highway postmiles from the project's text, in a listed county (see postmiles.ts). */
+  postmile?: { lon: number; lat: number; label: string };
+  /** Roads and waterways the project's text names, already checked against the listed places (see namedLines.ts). */
+  lines?: { lon: number; lat: number; kind: 'crossing' | 'along'; names: string[] };
 }
 
 /** Coastal, harbor, and border projects can sit just outside the county line. */
@@ -217,6 +227,16 @@ export function resolveLocation(
     return { lon, lat, precision: 'intersection', coordinatesRejected, streets };
   }
 
+  if (hints.postmile && agreesWithPlaces(hints.postmile, places, b)) {
+    const { lon, lat, label } = hints.postmile;
+    return { lon, lat, precision: 'postmile', coordinatesRejected, postmile: label };
+  }
+
+  if (hints.lines?.kind === 'crossing') {
+    const { lon, lat, names } = hints.lines;
+    return { lon, lat, precision: 'crossing', coordinatesRejected, streets: names };
+  }
+
   if (hints.landmark && hints.landmark.rank < 3) {
     const { lon, lat, name } = hints.landmark;
     return { lon, lat, precision: 'landmark', coordinatesRejected, landmark: name };
@@ -225,6 +245,11 @@ export function resolveLocation(
   if (hints.crossStreets) {
     const { lon, lat, streets } = hints.crossStreets;
     return { lon, lat, precision: 'street', coordinatesRejected, streets };
+  }
+
+  if (hints.lines) {
+    const { lon, lat, names } = hints.lines;
+    return { lon, lat, precision: 'street', coordinatesRejected, streets: names };
   }
 
   if (hints.landmark) {

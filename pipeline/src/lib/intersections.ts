@@ -14,7 +14,7 @@ import { seededRandom } from './random.ts';
 import type { ShapefileFeature } from './shapefile.ts';
 import { streetKeys } from './streets.ts';
 
-interface Line {
+export interface Line {
   coords: [number, number][];
   bbox: BBox;
 }
@@ -24,7 +24,7 @@ export interface RoadIndex {
   byKey: Map<string, Line[]>;
 }
 
-function lineBBox(coords: [number, number][]): BBox {
+export function lineBBox(coords: [number, number][]): BBox {
   let w = Infinity;
   let s = Infinity;
   let e = -Infinity;
@@ -66,7 +66,7 @@ export function buildRoadIndex(features: Iterable<ShapefileFeature>, wanted: Set
  *   loose:  also the bare name ("Olive" finds Olive Ave and Olive St);
  *           used only when the strict pass finds nothing
  */
-function linesFor(index: RoadIndex, name: string, loose: boolean): Line[] | null {
+export function linesFor(index: RoadIndex, name: string, loose: boolean): Line[] | null {
   const k = streetKeys(name);
   if (!k) return null;
   // Index keys are the roads' own full/nodir/base names; match ours against them.
@@ -120,7 +120,7 @@ export function crossings(a: Line[], b: Line[]): { lon: number; lat: number }[] 
 export const NEAR_MEET_KM = 0.06;
 
 /** Shortest distance (km) from a point to segment q1-q2, in a local flat projection. */
-function pointSegmentKm(p: [number, number], q1: [number, number], q2: [number, number]): number {
+export function pointSegmentKm(p: [number, number], q1: [number, number], q2: [number, number]): number {
   const kx = 111.32 * Math.cos((p[1] * Math.PI) / 180);
   const ky = 111.32;
   const ax = (q1[0] - p[0]) * kx;
@@ -208,38 +208,64 @@ function match(
 ): IntersectionResult {
   const lines = names.map((n) => linesFor(index, n, loose));
   if (lines.filter(Boolean).length < 2) return { ok: false, reason: 'street-not-found' };
+  const r = firstMeeting(lines, area);
+  return r.ok ? { ok: true, lon: r.lon, lat: r.lat, streets: [names[r.i], names[r.j]] } : r;
+}
 
+export type MeetingResult =
+  | { ok: true; lon: number; lat: number; i: number; j: number }
+  | { ok: false; reason: 'no-crossing' | 'ambiguous' | 'outside-area' };
+
+/**
+ * Where any two of these line sets meet, in the order given (the first pair
+ * that meets in one place wins), inside or near the area. A pair meeting in
+ * several far-apart places is ambiguous.
+ */
+export function firstMeeting(
+  lines: readonly (Line[] | null)[],
+  area: { city?: Area | null; county?: Area | null },
+  pairAllowed: (i: number, j: number) => boolean = () => true,
+): MeetingResult {
   let sawCrossing = false;
   let sawOutside = false;
   let sawAmbiguous = false;
-  for (let i = 0; i < names.length; i++) {
-    for (let j = i + 1; j < names.length; j++) {
-      if (!lines[i] || !lines[j]) continue;
+  for (let i = 0; i < lines.length; i++) {
+    for (let j = i + 1; j < lines.length; j++) {
+      if (!lines[i] || !lines[j] || !pairAllowed(i, j)) continue;
       let points = crossings(lines[i]!, lines[j]!);
       if (points.length === 0) points = nearMeetings(lines[i]!, lines[j]!);
       if (points.length === 0) continue;
       sawCrossing = true;
-      if (area.county) points = points.filter((p) => distanceToShapeKm(p.lon, p.lat, area.county!.shape) <= 0.5);
-      let candidates = points;
-      if (area.city) {
-        candidates = points.filter((p) => distanceToShapeKm(p.lon, p.lat, area.city!.shape) <= CITY_SLACK_KM);
-        if (candidates.length === 0) {
-          // The listed city may just be the nearest one: accept a single nearby crossing.
-          candidates = points.filter((p) => distanceToShapeKm(p.lon, p.lat, area.city!.shape) <= CITY_NEARBY_KM);
-        }
-      }
+      const candidates = withinArea(points, area);
       if (candidates.length === 0) {
         sawOutside = true;
         continue;
       }
       const place = onePlace(candidates);
-      if (place) return { ok: true, ...place, streets: [names[i], names[j]] };
+      if (place) return { ok: true, ...place, i, j };
       sawAmbiguous = true;
     }
   }
   if (sawAmbiguous) return { ok: false, reason: 'ambiguous' };
   if (sawOutside) return { ok: false, reason: 'outside-area' };
   return { ok: false, reason: sawCrossing ? 'outside-area' : 'no-crossing' };
+}
+
+/**
+ * Points in the county (0.5 km slack) and in or near the listed city: within
+ * CITY_SLACK_KM, or else within CITY_NEARBY_KM (the listed city may just be
+ * the nearest one).
+ */
+export function withinArea<P extends { lon: number; lat: number }>(
+  points: P[],
+  area: { city?: Area | null; county?: Area | null },
+): P[] {
+  if (area.county) points = points.filter((p) => distanceToShapeKm(p.lon, p.lat, area.county!.shape) <= 0.5);
+  if (!area.city) return points;
+  const near = points.filter((p) => distanceToShapeKm(p.lon, p.lat, area.city!.shape) <= CITY_SLACK_KM);
+  return near.length > 0
+    ? near
+    : points.filter((p) => distanceToShapeKm(p.lon, p.lat, area.city!.shape) <= CITY_NEARBY_KM);
 }
 
 /** A single listed street is only useful if it is short within the area. */
@@ -263,6 +289,15 @@ export function placeAlongStreet(
 ): StreetResult {
   const lines = linesFor(index, name, false) ?? linesFor(index, name, true);
   if (!lines) return { ok: false, reason: 'street-not-found' };
+  return placeAlongLines(lines, area, seed);
+}
+
+/** A seeded random spot along these lines, on the part inside the area (see placeAlongStreet). */
+export function placeAlongLines(
+  lines: Line[],
+  area: { city?: Area | null; county?: Area | null },
+  seed: string,
+): StreetResult {
   const within = area.city ?? area.county;
   const segs: { a: [number, number]; b: [number, number]; km: number }[] = [];
   for (const l of lines) {

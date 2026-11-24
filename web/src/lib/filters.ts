@@ -114,7 +114,7 @@ export function scopeCounts(
     byStatus: meta.counts.byStatus,
     byMark: {
       exact: p.exact + (p.address ?? 0),
-      intersection: (p.intersection ?? 0) + (p.landmark ?? 0),
+      intersection: (p.intersection ?? 0) + (p.postmile ?? 0) + (p.crossing ?? 0) + (p.landmark ?? 0),
       approx: (p.street ?? 0) + (p.community ?? 0) + (p.zip ?? 0) + p.city + p.county + p.region,
     },
     windowed: false,

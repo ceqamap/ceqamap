@@ -40,13 +40,14 @@ const LOCATIONS: { id: MapMark; dot: string; label: string; title: string }[] = 
     id: 'intersection',
     dot: 'cross',
     label: 'Near a named location',
-    title: 'Where the listed cross streets meet, or a place named in the project description',
+    title:
+      'Where the listed cross streets meet, at the highway postmiles, or at a place, road crossing or stream crossing named in the project description',
   },
   {
     id: 'approx',
     dot: 'ring',
     label: 'Approximate location',
-    title: 'Somewhere in the listed community, ZIP code, city or county',
+    title: 'Somewhere along a named street or waterway, or in the listed community, ZIP code, city or county',
   },
 ];
 

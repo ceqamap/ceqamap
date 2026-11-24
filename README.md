@@ -11,6 +11,8 @@ automatically.
 
 ```
  CEQAnet CSV export ──► Data refresh (GitHub Actions, every 3 h)
+ CEQAnet project pages ─► Project pages (hourly: "Other Location Info"
+                          │  for the past 12 months, state/pages.json)
                           │  fetch recent filings, repair CSV, normalize
                           │  derive each project's stage and location
                           │  build map tiles (tippecanoe → PMTiles)

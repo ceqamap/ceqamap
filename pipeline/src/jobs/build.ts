@@ -31,9 +31,12 @@ import { addressRequest, placeAtAddresses, type AddressRequest } from '../lib/ad
 import { loadGeocodeCache, saveGeocodeCache } from '../lib/geocode.ts';
 import { crossStreetRequest, placeAtCrossStreets, type CrossStreetRequest } from '../lib/crossStreets.ts';
 import { type Gazetteer, landmarkFor, placeNameTest } from '../lib/landmarks.ts';
-import { type AddressPlacement, type LocationHints, resolveLocation } from '../lib/location.ts';
+import { type AddressPlacement, type LocationHints, listedPlaces, resolveLocation } from '../lib/location.ts';
 import { log } from '../lib/log.ts';
-import { countyFips, countyRoads } from '../lib/tiger.ts';
+import { lineRequest, type LineRequest } from '../lib/namedLines.ts';
+import { attachPageInfo, loadPages } from '../lib/pages.ts';
+import { placeAtPostmiles, type PostmileTable } from '../lib/postmiles.ts';
+import { countyFips, countyRoads, countyWater } from '../lib/tiger.ts';
 import { listPartitionMonths, readPartition } from '../lib/partitions.ts';
 import { storageFromEnv } from '../lib/storage.ts';
 
@@ -49,10 +52,20 @@ const gnisPath = process.env.GNIS_PATH ?? new URL('../../data/gnis.json', import
 const gnis = existsSync(gnisPath) ? (JSON.parse(await readFile(gnisPath, 'utf8')) as Gazetteer) : null;
 if (!gnis) log.warn('No gnis.json; skipping named-place placement', { gnisPath });
 const isPlaceName = placeNameTest(boundaries);
+// State highway postmiles (Caltrans), fetched by scripts/fetch-postmiles.ts. Optional like GNIS.
+const postmilesPath = process.env.POSTMILES_PATH ?? new URL('../../data/postmiles.json', import.meta.url).pathname;
+const postmileTable = existsSync(postmilesPath)
+  ? (JSON.parse(await readFile(postmilesPath, 'utf8')) as PostmileTable)
+  : null;
+if (!postmileTable) log.warn('No postmiles.json; skipping postmile placement', { postmilesPath });
 
 const docs: CeqaDocument[] = [];
 for (const month of await listPartitionMonths(storage)) docs.push(...(await readPartition(storage, month)));
 if (docs.length === 0) throw new Error('No documents in storage. Run backfill first.');
+// "Other Location Info" from project pages (the CSV leaves it out), attached
+// to each project's newest document before anything reads them (see pages.ts).
+const pageStats = attachPageInfo(groupBySch(docs).values(), await loadPages(storage));
+log.info('Page location info', pageStats);
 
 const builtAt = new Date().toISOString();
 const today = todayInCalifornia();
@@ -64,16 +77,33 @@ const requests: CrossStreetRequest[] = [];
 const addressRequests: AddressRequest[] = [];
 const landmarks = new Map<string, NonNullable<LocationHints['landmark']>>();
 const landmarkStats: Record<string, number> = {};
+const lineRequests: LineRequest[] = [];
+const postmiles = new Map<string, NonNullable<LocationHints['postmile']>>();
+const postmileStats: Record<string, number> = {};
 for (const [sch, list] of groupBySch(docs)) {
   const newestFirst = [...list].sort((a, b) => (a.received < b.received ? 1 : a.received > b.received ? -1 : 0));
   if (resolveLocation(sch, newestFirst, boundaries)?.precision === 'exact') continue;
+  let ambiguous;
   if (gnis) {
     const r = landmarkFor(newestFirst, boundaries, gnis, isPlaceName);
     landmarkStats[r.kind] = (landmarkStats[r.kind] ?? 0) + 1;
     if (r.kind === 'placed') landmarks.set(sch, r.placement);
+    ambiguous = r.ambiguous;
+  }
+  if (postmileTable) {
+    const d = newestFirst[0];
+    const r = placeAtPostmiles(
+      `${d.projectTitle}\n${d.description}\n${d.crossStreets}\n${d.otherLocation ?? ''}`,
+      listedPlaces(newestFirst, boundaries).counties,
+      postmileTable,
+    );
+    postmileStats[r.kind] = (postmileStats[r.kind] ?? 0) + 1;
+    if (r.kind === 'placed') postmiles.set(sch, { lon: r.lon, lat: r.lat, label: r.label });
   }
   const req = crossStreetRequest(sch, newestFirst, boundaries, (k) => fips.has(k));
   if (req) requests.push(req);
+  const lreq = lineRequest(sch, newestFirst, boundaries, (k) => fips.has(k), isPlaceName, req?.names, ambiguous);
+  if (lreq) lineRequests.push(lreq);
   const addr = addressRequest(sch, newestFirst, boundaries);
   if (addr) addressRequests.push(addr);
 }
@@ -93,15 +123,32 @@ if (process.env.SKIP_GEOCODING !== '1') {
   if (addressStats.newlySent > 0) await saveGeocodeCache(storage, cache);
   log.info('Address placement', addressStats);
 }
-const { placements, stats: crossStreetStats } =
-  process.env.SKIP_CROSS_STREETS === '1'
-    ? { placements: new Map(), stats: { requests: 0, outcomes: {} } }
-    : await placeAtCrossStreets(requests, boundaries, (county) => countyRoads(tigerDir, fips.get(county)!));
+const {
+  placements,
+  stats: crossStreetStats,
+  linePlacements,
+  lineStats,
+} = process.env.SKIP_CROSS_STREETS === '1'
+  ? { placements: new Map(), stats: { requests: 0, outcomes: {} }, linePlacements: new Map(), lineStats: {} }
+  : await placeAtCrossStreets(requests, boundaries, (county) => countyRoads(tigerDir, fips.get(county)!), {
+      requests: lineRequests,
+      loadWater: (county) => countyWater(tigerDir, fips.get(county)!),
+    });
+// Named roads and waterways: crossings and spots along one line, and same-name
+// places a named road settled (these fill in as named places).
+const lines = new Map<string, NonNullable<LocationHints['lines']>>();
+for (const [sch, p] of linePlacements) {
+  if (p.kind === 'place') {
+    if (!landmarks.has(sch)) landmarks.set(sch, { lon: p.lon, lat: p.lat, name: p.name, rank: p.rank });
+  } else lines.set(sch, { lon: p.lon, lat: p.lat, kind: p.kind, names: [...p.names] });
+}
 
 const result = aggregate(docs, boundaries, today, builtAt, {
   crossStreets: placements,
   addresses: addressPlacements,
   landmarks,
+  postmiles,
+  lines,
 });
 
 // Arrivals: flag projects with documents first seen in the latest batch.
@@ -148,6 +195,9 @@ log.info('Aggregated', {
   crossStreets: crossStreetStats,
   addresses: addressStats,
   landmarks: landmarkStats,
+  postmiles: postmileStats,
+  pages: pageStats,
+  namedLines: lineStats,
   scopes: Object.fromEntries(TIME_SCOPES.map((s) => [s.id, scopes[s.id].counts.mapped])),
   arrivals: arrivals.published
     ? { at: arrivals.published.at, projects: arrivals.published.projects, filings: arrivals.published.filings }
