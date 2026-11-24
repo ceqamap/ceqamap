@@ -21,6 +21,7 @@ on:
             sample-pages,
             fetch-pages,
             show-published,
+            explain-anchor,
           ]
         default: match-intersections
       sch:
@@ -75,7 +76,7 @@ jobs:
       - name: Ensure city, county and ZIP boundaries
         run: node pipeline/scripts/boundaries-current.ts || NODE_OPTIONS=--max-old-space-size=8192 pnpm --filter @ceqa-atlas/pipeline boundaries
       - name: Fetch GNIS names
-        if: inputs.script == 'match-landmarks' || inputs.script == 'explain-location' || inputs.script == 'match-named-lines'
+        if: inputs.script == 'match-landmarks' || inputs.script == 'explain-location' || inputs.script == 'match-named-lines' || inputs.script == 'explain-anchor'
         run: node pipeline/scripts/fetch-gnis.ts
       - name: Fetch highway postmiles
         if: inputs.script == 'explain-location' || inputs.script == 'match-named-lines'
