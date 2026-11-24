@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { stageFlags } from '../../packages/shared/src/index.ts';
 import { aggregate } from '../src/lib/aggregate.ts';
 import {
   Anchors,
@@ -117,7 +118,7 @@ describe('area tiles', () => {
     point: {
       type: 'Feature',
       geometry: { type: 'Point', coordinates: [0, 0] },
-      properties: { id, t: id, s, x: 0, r: s === 'in_review' ? 1 : 0, n: 0, [`c_${s}`]: 1 },
+      properties: { id, t: id, s, x: 0, r: s === 'in_review' ? 1 : 0, n: 0, ...stageFlags(s) },
     },
     area: { kind: 'city', keys, name: 'Fresno' },
     latest,
