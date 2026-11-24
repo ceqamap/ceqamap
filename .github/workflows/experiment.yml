@@ -20,6 +20,7 @@ on:
             compare-months,
             sample-pages,
             fetch-pages,
+            show-published,
           ]
         default: match-intersections
       sch:
