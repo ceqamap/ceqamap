@@ -15,7 +15,8 @@
  * tippecanoe's per-feature zoom ranges and no clustering. Selecting a project
  * highlights its area's outline from the boundaries tileset.
  *
- * Anchors: a city's own GNIS "Populated Place" point (its downtown), else the
+ * Anchors: a city's own GNIS "Populated Place" point (its downtown; else its
+ * "Civil" point), else the
  * point deepest inside its outline; a ZIP code's deepest point; a county's
  * deepest point, except that county badges sit at the county seat, where most
  * of what they count is.
@@ -192,19 +193,21 @@ export class Anchors {
     this.gnis = gnis;
   }
 
-  /** A city's downtown (its GNIS populated place inside or within 1 km of it), else its deepest point. */
+  /** A city's downtown (its GNIS populated place, else civil point, inside it), else its deepest point. */
   city(key: string): LonLat | null {
     return this.memo(`city:${key}`, () => {
       const a = this.b.places[key];
       if (!a) return null;
       const pad = 0.01;
-      const named = (this.gnis?.names[key] ?? []).filter(
+      const candidates = [...(this.gnis?.towns?.[key] ?? []), ...(this.gnis?.names[key] ?? [])].filter(
         (f) =>
-          f.c === 'Populated Place' &&
+          (f.c === 'Populated Place' || f.c === 'Civil') &&
           inBBox(f.lon, f.lat, [a.bbox[0] - pad, a.bbox[1] - pad, a.bbox[2] + pad, a.bbox[3] + pad]) &&
           pointInShape(f.lon, f.lat, a.shape),
       );
-      return named[0] ? { lon: named[0].lon, lat: named[0].lat } : interiorPoint(a.shape, a.bbox);
+      // The populated place is the downtown; the civil (incorporated city) point is the fallback.
+      const named = candidates.find((f) => f.c === 'Populated Place') ?? candidates[0];
+      return named ? { lon: named.lon, lat: named.lat } : interiorPoint(a.shape, a.bbox);
     });
   }
 
@@ -227,7 +230,11 @@ export class Anchors {
     return this.memo(`seat:${key}`, () => {
       const seat = COUNTY_SEAT[key]?.toLowerCase();
       if (seat && this.b.places[seat]) return this.city(seat);
-      const g = seat ? (this.gnis?.names[seat] ?? []).find((f) => f.c === 'Populated Place' && f.k === key) : null;
+      const g = seat
+        ? [...(this.gnis?.towns?.[seat] ?? []), ...(this.gnis?.names[seat] ?? [])].find(
+            (f) => f.c === 'Populated Place' && f.k === key,
+          )
+        : null;
       return g ? { lon: g.lon, lat: g.lat } : this.county(key);
     });
   }

@@ -47,10 +47,15 @@ const B: Boundaries = {
   },
   zips: { '93721': area('93721', rect(-119.8, 36.72, -119.77, 36.75)) },
 };
+// One-word names live only in `towns` (see parseGnis).
 const GNIS: Gazetteer = {
   source: 'test',
-  names: {
-    fresno: [{ n: 'Fresno', c: 'Populated Place', k: 'fresno', lon: -119.7871, lat: 36.7378 }],
+  names: {},
+  towns: {
+    fresno: [
+      { n: 'City of Fresno', c: 'Civil', k: 'fresno', lon: -119.77, lat: 36.75 },
+      { n: 'Fresno', c: 'Populated Place', k: 'fresno', lon: -119.7871, lat: 36.7378 },
+    ],
     independence: [{ n: 'Independence', c: 'Populated Place', k: 'inyo', lon: -118.2001, lat: 36.8027 }],
   },
 };
