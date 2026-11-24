@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   type LocationPrecision,
   PRECISION_LABEL,
+  type PublishedArea,
   type PublishedProject,
   STATUS_BY_ID,
 } from '../../../packages/shared/src/index.ts';
@@ -40,11 +41,25 @@ const FALLBACK_PHRASE: Record<LocationPrecision, string> = {
   landmark: 'at a place named in its description',
   street: 'along a street or waterway it names',
   community: 'at a community named in its description',
-  zip: 'within its listed ZIP code',
-  city: 'within its listed city',
-  county: 'within its listed county',
-  region: 'between its listed counties',
+  zip: 'somewhere in its listed ZIP code',
+  city: 'somewhere in its listed city',
+  county: 'somewhere in its listed county',
+  region: 'somewhere in its listed counties',
 };
+
+/** "the city", "the cities", "the ZIP code", "the county", "the counties". */
+function areaPhrase(area: PublishedArea): string {
+  const many = area.keys.length > 1;
+  return area.kind === 'zip'
+    ? 'the ZIP code'
+    : area.kind === 'city'
+      ? many
+        ? 'the cities'
+        : 'the city'
+      : many
+        ? 'the counties'
+        : 'the county';
+}
 
 export function Drawer({ sch, mode, onClose, onLoaded }: Props) {
   const [state, setState] = useState<State>({ kind: 'idle' });
@@ -166,21 +181,30 @@ function ProjectDetail({
       </h2>
       <p className="drawer-agency">{p.leadAgency}</p>
 
-      {(place || p.location) && (
+      {p.location?.area ? (
         <p className="drawer-place">
-          {place}
-          {p.location && (
-            <span className="muted">
-              {' · '}
-              {PRECISION_LABEL[p.location.precision]}
-              {p.location.streets && ` (${p.location.streets.join(' and ')})`}
-              {p.location.address && ` (${p.location.address})`}
-              {p.location.landmark && ` (${p.location.landmark})`}
-              {p.location.postmile && ` (${p.location.postmile})`}
-              {p.location.precision === 'zip' && p.location.zip && ` (${p.location.zip})`}
-            </span>
-          )}
+          Somewhere in {p.location.area.name}
+          <span className="muted">
+            {' · '}Location given only as {areaPhrase(p.location.area)}
+          </span>
         </p>
+      ) : (
+        (place || p.location) && (
+          <p className="drawer-place">
+            {place}
+            {p.location && (
+              <span className="muted">
+                {' · '}
+                {PRECISION_LABEL[p.location.precision]}
+                {p.location.streets && ` (${p.location.streets.join(' and ')})`}
+                {p.location.address && ` (${p.location.address})`}
+                {p.location.landmark && ` (${p.location.landmark})`}
+                {p.location.postmile && ` (${p.location.postmile})`}
+                {p.location.precision === 'zip' && p.location.zip && ` (${p.location.zip})`}
+              </span>
+            )}
+          </p>
+        )
       )}
       {p.location?.coordinatesRejected && (
         <p className="drawer-note muted">

@@ -31,12 +31,19 @@ import { addressRequest, placeAtAddresses, type AddressRequest } from '../lib/ad
 import { loadGeocodeCache, saveGeocodeCache } from '../lib/geocode.ts';
 import { crossStreetRequest, placeAtCrossStreets, type CrossStreetRequest } from '../lib/crossStreets.ts';
 import { type Gazetteer, landmarkFor, placeNameTest } from '../lib/landmarks.ts';
-import { type AddressPlacement, type LocationHints, listedPlaces, resolveLocation } from '../lib/location.ts';
+import {
+  type AddressPlacement,
+  type LocationHints,
+  listedPlaces,
+  type PlacementArea,
+  resolveLocation,
+} from '../lib/location.ts';
 import { log } from '../lib/log.ts';
 import { lineRequest, type LineRequest } from '../lib/namedLines.ts';
 import { attachPageInfo, loadPages } from '../lib/pages.ts';
 import { placeAtPostmiles, type PostmileTable } from '../lib/postmiles.ts';
 import { countyFips, countyRoads, countyWater } from '../lib/tiger.ts';
+import { Anchors, type AreaMember, areaTileFeatures, boundaryFeatures } from '../lib/areas.ts';
 import { listPartitionMonths, readPartition } from '../lib/partitions.ts';
 import { storageFromEnv } from '../lib/storage.ts';
 
@@ -143,7 +150,10 @@ for (const [sch, p] of linePlacements) {
   } else lines.set(sch, { lon: p.lon, lat: p.lat, kind: p.kind, names: [...p.names] });
 }
 
+// Projects known only to a city, ZIP code or county are grouped by area (see areas.ts).
+const anchors = new Anchors(boundaries, gnis);
 const result = aggregate(docs, boundaries, today, builtAt, {
+  anchors,
   crossStreets: placements,
   addresses: addressPlacements,
   landmarks,
@@ -165,9 +175,32 @@ const scopes = splitByScope(result.points, lastFilingDates(result.projects), tod
 await rm(OUT, { recursive: true, force: true });
 await mkdir(join(OUT, 'projects'), { recursive: true });
 
+// Per window: points with a place of their own go to the clustered tileset;
+// projects known only to an area go to the area tileset (badges and spirals).
+const projectArea = new Map<string, PlacementArea>();
+const latestFiling = lastFilingDates(result.projects);
+for (const p of result.projects) {
+  const a = p.location?.area;
+  if (a) projectArea.set(p.sch, { kind: a.kind, keys: a.keys.map((k) => k.slice(a.kind.length + 1)), name: a.name });
+}
+const areaStats: Record<string, number> = {};
 for (const scope of TIME_SCOPES) {
-  const lines = scopes[scope.id].points.map((f) => JSON.stringify(f));
-  await writeFile(join(OUT, `points-${scope.id}.ndjson`), lines.join('\n') + '\n');
+  const own: string[] = [];
+  const members: AreaMember[] = [];
+  for (const f of scopes[scope.id].points) {
+    const area = projectArea.get(f.properties.id);
+    if (area) members.push({ point: f, area, latest: latestFiling.get(f.properties.id) ?? '' });
+    else own.push(JSON.stringify(f));
+  }
+  await writeFile(join(OUT, `points-${scope.id}.ndjson`), own.join('\n') + '\n');
+  const features = areaTileFeatures(members, boundaries, anchors);
+  await writeFile(join(OUT, `areas-${scope.id}.ndjson`), features.map((f) => JSON.stringify(f)).join('\n') + '\n');
+  areaStats[scope.id] = members.length;
+}
+{
+  const lines: string[] = [];
+  for (const line of boundaryFeatures(boundaries)) lines.push(line);
+  await writeFile(join(OUT, 'boundaries.ndjson'), lines.join('\n') + '\n');
 }
 for (const p of result.projects) {
   // builtAt is excluded from hashing at publish time, so unchanged projects are not re-uploaded.
@@ -198,6 +231,7 @@ log.info('Aggregated', {
   postmiles: postmileStats,
   pages: pageStats,
   namedLines: lineStats,
+  areaGrouped: areaStats,
   scopes: Object.fromEntries(TIME_SCOPES.map((s) => [s.id, scopes[s.id].counts.mapped])),
   arrivals: arrivals.published
     ? { at: arrivals.published.at, projects: arrivals.published.projects, filings: arrivals.published.filings }
@@ -248,5 +282,55 @@ for (const scope of TIME_SCOPES) {
   );
   if (tippecanoe.error) throw new Error(`tippecanoe could not start: ${tippecanoe.error.message}`);
   if (tippecanoe.status !== 0) throw new Error(`tippecanoe exited with ${tippecanoe.status} (${scope.id})`);
+
+  // Area badges and spirals: no clustering (each feature has its own zoom range, see areas.ts).
+  runTippecanoe(`areas ${scope.id}`, [
+    '--output',
+    join(OUT, `areas-${scope.id}.pmtiles`),
+    '--force',
+    '--layer',
+    'areas',
+    '--name',
+    `CEQA projects by area (${scope.label})`,
+    '--minimum-zoom',
+    '3',
+    '--maximum-zoom',
+    '14',
+    '--drop-rate',
+    '1',
+    '--no-feature-limit',
+    '--no-tile-size-limit',
+    '--quiet',
+    join(OUT, `areas-${scope.id}.ndjson`),
+  ]);
 }
+
+// City, ZIP code and county outlines, for highlighting a selected project's area.
+runTippecanoe('boundaries', [
+  '--output',
+  join(OUT, 'boundaries.pmtiles'),
+  '--force',
+  '--layer',
+  'areas',
+  '--name',
+  'California cities, ZIP codes and counties',
+  '--attribution',
+  'Boundaries: U.S. Census Bureau',
+  '--minimum-zoom',
+  '4',
+  '--maximum-zoom',
+  '11',
+  '--detect-shared-borders',
+  '--no-feature-limit',
+  '--no-tile-size-limit',
+  '--read-parallel',
+  '--quiet',
+  join(OUT, 'boundaries.ndjson'),
+]);
 log.info('Build finished', { buildId });
+
+function runTippecanoe(what: string, args: string[]) {
+  const r = spawnSync(process.env.TIPPECANOE ?? 'tippecanoe', args, { stdio: 'inherit' });
+  if (r.error) throw new Error(`tippecanoe could not start: ${r.error.message}`);
+  if (r.status !== 0) throw new Error(`tippecanoe exited with ${r.status} (${what})`);
+}

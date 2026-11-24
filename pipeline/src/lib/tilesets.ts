@@ -1,16 +1,19 @@
 /**
- * Tileset naming and pruning. Every build publishes one immutable tileset per
- * time window: tiles/projects-<buildId>-<scope>.pmtiles. Older builds used
- * tiles/projects-<buildId>.pmtiles.
+ * Tileset naming and pruning. Every build publishes immutable tilesets: per
+ * time window tiles/projects-<buildId>-<scope>.pmtiles and
+ * tiles/areas-<buildId>-<scope>.pmtiles, and once tiles/boundaries-<buildId>.pmtiles.
+ * Older builds used tiles/projects-<buildId>.pmtiles.
  */
 
-export function tilesetName(buildId: string, scope: string): string {
-  return `projects-${buildId}-${scope}.pmtiles`;
+export type TilesetKind = 'projects' | 'areas' | 'boundaries';
+
+export function tilesetName(buildId: string, scope: string | null, kind: TilesetKind = 'projects'): string {
+  return scope ? `${kind}-${buildId}-${scope}.pmtiles` : `${kind}-${buildId}.pmtiles`;
 }
 
 /** The build id in a tileset key, or null if the key is not a tileset. */
 export function buildIdOf(key: string): string | null {
-  return /(?:^|\/)projects-(\d{14})(?:-[a-z0-9]+)?\.pmtiles$/.exec(key)?.[1] ?? null;
+  return /(?:^|\/)(?:projects|areas|boundaries)-(\d{14})(?:-[a-z0-9]+)?\.pmtiles$/.exec(key)?.[1] ?? null;
 }
 
 /**

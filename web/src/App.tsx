@@ -8,6 +8,7 @@ import {
   type ProjectStatus,
   type PublishedMeta,
   type PublishedProject,
+  STATUS_BY_ID,
   type TimeScope,
 } from '../../packages/shared/src/index.ts';
 import { Controls } from './components/Controls.tsx';
@@ -19,7 +20,7 @@ import { absoluteDataUrl, DataStatusError, fetchMeta, META_POLL_MS, META_POLL_PE
 import { ALL_MARKS, filterParams, marksSupported, readMarks, readScope, readStages } from './lib/filters.ts';
 import { todayInCalifornia } from './lib/format.ts';
 import { basemapById, type BasemapId } from './map/basemaps.ts';
-import { type HoverInfo, MapView, type MapViewHandle } from './map/MapView.tsx';
+import { type HoverInfo, MapView, type MapViewHandle, type SelectedArea } from './map/MapView.tsx';
 
 /**
  * URL state, so every view is shareable:
@@ -55,7 +56,17 @@ export function App() {
   const [stages, setStages] = useState<ProjectStatus[]>(() => readStages(new URLSearchParams(location.search)));
   const [marksWanted, setMarks] = useState<MapMark[]>(() => readMarks(new URLSearchParams(location.search)));
   const [hover, setHover] = useState<HoverInfo | null>(null);
-  const [focus, setFocus] = useState<{ lon: number; lat: number } | null>(null);
+  const [focus, setFocus] = useState<{
+    lon: number;
+    lat: number;
+    bbox?: [number, number, number, number];
+  } | null>(null);
+  // The selected project's area, when it's known only to a city, ZIP code or county.
+  const [loadedArea, setLoadedArea] = useState<{
+    sch: string;
+    area: Omit<SelectedArea, 'color'>;
+    status: ProjectStatus;
+  } | null>(null);
   const openedFromLink = useRef(selected !== null);
 
   const basemap = useMemo(() => basemapById(basemapId), [basemapId]);
@@ -74,6 +85,10 @@ export function App() {
 
   // Each time window has its own tileset; data built before windows existed has only `tiles`.
   const tilesUrl = meta ? absoluteDataUrl(meta.scopes?.[scope]?.tiles || meta.tiles) : null;
+  // Projects known only to an area, and the outlines (absent in data built before them).
+  const areaTiles = meta?.scopes?.[scope]?.areaTiles;
+  const areaTilesUrl = areaTiles ? absoluteDataUrl(areaTiles) : null;
+  const boundariesUrl = meta?.boundaries ? absoluteDataUrl(meta.boundaries) : null;
 
   // Load meta, then poll so the map refreshes itself when new filings land.
   // Poll every minute until data exists, then every five minutes.
@@ -162,9 +177,11 @@ export function App() {
 
   const onLoaded = useCallback(
     (p: PublishedProject) => {
+      const area = p.location?.area;
+      setLoadedArea(area ? { sch: p.sch, area: { keys: area.keys, bbox: area.bbox }, status: p.status } : null);
       // Only fly when the project was opened from a shared link, not a click.
       if (openedFromLink.current && p.location) {
-        setFocus({ lon: p.location.lon, lat: p.location.lat });
+        setFocus({ lon: p.location.lon, lat: p.location.lat, ...(area ? { bbox: area.bbox } : {}) });
         // Make sure the linked project is actually drawn: widen the time
         // window and show its stage and location if the current filters hide it.
         const { scope: s, stages: st, marks: mk, meta: m } = current.current;
@@ -185,6 +202,15 @@ export function App() {
     [changeFilters],
   );
 
+  // Outline the selected project's area in its stage color; nothing once it's closed.
+  const selectedArea = useMemo<SelectedArea | null>(
+    () =>
+      loadedArea && loadedArea.sch === selected
+        ? { ...loadedArea.area, color: STATUS_BY_ID[loadedArea.status][basemap.mode] }
+        : null,
+    [loadedArea, selected, basemap.mode],
+  );
+
   const changeBasemap = useCallback((id: BasemapId) => {
     setMapError(null);
     setBasemapId(id);
@@ -197,6 +223,9 @@ export function App() {
         ref={map}
         basemap={basemap}
         tilesUrl={tilesUrl}
+        areaTilesUrl={areaTilesUrl}
+        boundariesUrl={boundariesUrl}
+        selectedArea={selectedArea}
         stages={stages}
         marks={marks}
         selected={selected}

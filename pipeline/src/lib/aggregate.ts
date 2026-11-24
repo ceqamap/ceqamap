@@ -13,6 +13,7 @@ import {
 import type { CeqaDocument } from './document.ts';
 import type { Boundaries } from './boundaries.ts';
 import type { CrossStreetPlacement } from './crossStreets.ts';
+import { type Anchors, publishedArea } from './areas.ts';
 import { type AddressPlacement, type LocationHints, resolveLocation } from './location.ts';
 import { deriveStatus } from './status.ts';
 
@@ -75,11 +76,19 @@ export function buildProject(
   today: string,
   builtAt: string,
   hints: LocationHints = {},
+  anchors?: Anchors,
 ): PublishedProject {
   const newestFirst = [...docs].sort((a, b) => (a.received < b.received ? 1 : a.received > b.received ? -1 : 0));
   const latest = newestFirst[0];
   const status = deriveStatus(docs, today);
   const loc = resolveLocation(sch, newestFirst, boundaries, hints);
+  // Known only to an area: publish the area, and its anchor as the point (see areas.ts).
+  const area = loc?.area && anchors ? publishedArea(loc.area, boundaries) : null;
+  const anchor = area && loc?.area ? anchors!.of(loc.area) : null;
+  if (loc && anchor) {
+    loc.lon = anchor.lon;
+    loc.lat = anchor.lat;
+  }
   const placeDoc = newestFirst.find((d) => d.cities.length || d.counties.length) ?? latest;
 
   return {
@@ -104,6 +113,7 @@ export function buildProject(
           ...(loc.address ? { address: loc.address } : {}),
           ...(loc.landmark ? { landmark: loc.landmark } : {}),
           ...(loc.postmile ? { postmile: loc.postmile } : {}),
+          ...(area && anchor ? { area } : {}),
         }
       : null,
     facts: {
@@ -138,6 +148,8 @@ export interface Placements {
   landmarks?: ReadonlyMap<string, NonNullable<LocationHints['landmark']>>;
   postmiles?: ReadonlyMap<string, NonNullable<LocationHints['postmile']>>;
   lines?: ReadonlyMap<string, NonNullable<LocationHints['lines']>>;
+  /** Area anchors: when given, projects known only to an area carry it (see areas.ts). */
+  anchors?: Anchors;
 }
 
 export function aggregate(
@@ -175,13 +187,21 @@ export function aggregate(
   for (const [sch, list] of groups) {
     documents += list.length;
     for (const d of list) if (d.received > latestReceived) latestReceived = d.received;
-    const p = buildProject(sch, list, boundaries, today, builtAt, {
-      crossStreets: placements.crossStreets?.get(sch),
-      address: placements.addresses?.get(sch),
-      landmark: placements.landmarks?.get(sch),
-      postmile: placements.postmiles?.get(sch),
-      lines: placements.lines?.get(sch),
-    });
+    const p = buildProject(
+      sch,
+      list,
+      boundaries,
+      today,
+      builtAt,
+      {
+        crossStreets: placements.crossStreets?.get(sch),
+        address: placements.addresses?.get(sch),
+        landmark: placements.landmarks?.get(sch),
+        postmile: placements.postmiles?.get(sch),
+        lines: placements.lines?.get(sch),
+      },
+      placements.anchors,
+    );
     projects.push(p);
     byStatus[p.status]++;
     if (p.location) {

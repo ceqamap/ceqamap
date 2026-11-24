@@ -47,7 +47,8 @@ const LOCATIONS: { id: MapMark; dot: string; label: string; title: string }[] = 
     id: 'approx',
     dot: 'ring',
     label: 'Approximate location',
-    title: 'Somewhere along a named street or waterway, or in the listed community, ZIP code, city or county',
+    title:
+      'Along a named street or waterway, or in a named community; projects known only to a city, ZIP code or county are grouped there in double-ring badges',
   },
 ];
 

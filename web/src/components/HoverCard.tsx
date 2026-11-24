@@ -24,7 +24,11 @@ export function HoverCard({
   if (info.kind === 'cluster') {
     return (
       <div className="hover-card card" style={style} role="tooltip">
-        <p className="hover-title">{formatNumber(info.count)} projects</p>
+        <p className="hover-title">
+          {formatNumber(info.count)} {info.count === 1 ? 'project' : 'projects'}
+          {info.area ? ` somewhere in ${info.area}` : ''}
+        </p>
+        {info.area && <p className="hover-meta">Located only to the area, not a spot</p>}
         <p className="hover-meta">
           {info.inReview > 0 ? (
             <>
@@ -58,7 +62,13 @@ export function HoverCard({
           aria-hidden="true"
         />
         {status.label}
-        {info.props.x === 0 ? ' · approximate location' : info.props.x === 2 ? ' · near the listed location' : ''}
+        {info.props.an
+          ? ` · somewhere in ${info.props.an}`
+          : info.props.x === 0
+            ? ' · approximate location'
+            : info.props.x === 2
+              ? ' · near the listed location'
+              : ''}
       </p>
       {arrival && arrivals && (
         <p className="hover-meta hover-new">
