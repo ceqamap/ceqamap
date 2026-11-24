@@ -25,8 +25,11 @@ const { values } = parseArgs({
     minutes: { type: 'string', default: '50' },
     days: { type: 'string', default: '365' },
     gap: { type: 'string', default: '8000' },
+    // SCH numbers to fetch before the rest (comma-separated), e.g. to check one project.
+    first: { type: 'string', default: '' },
   },
 });
+const first = new Set(values.first.split(',').filter(Boolean));
 const deadline = Date.now() + Number(values.minutes) * 60_000;
 const gapMs = Number(values.gap);
 const contact = process.env.CEQANET_CONTACT;
@@ -54,7 +57,10 @@ for (const [sch, list] of groupBySch(docs)) {
   if (have && have.latest >= latest) continue;
   todo.push({ sch, latest });
 }
-todo.sort((x, y) => (x.latest < y.latest ? 1 : x.latest > y.latest ? -1 : 0));
+todo.sort(
+  (x, y) =>
+    Number(first.has(y.sch)) - Number(first.has(x.sch)) || (x.latest < y.latest ? 1 : x.latest > y.latest ? -1 : 0),
+);
 log.info('Pages to fetch', { since, todo: todo.length, stored: Object.keys(store.pages).length, exact });
 
 let fetched = 0;
