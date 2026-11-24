@@ -25,6 +25,15 @@ export interface AddressRequest {
   places: ListedPlaces;
 }
 
+/** A California ZIP code written within 80 characters after the house number, as in "123 Main St, Town, CA 95660". */
+export function zipAfter(text: string, houseNumber: number): string | null {
+  const clean = text.replace(/\s+/g, ' ');
+  const at = clean.search(new RegExp(String.raw`\b${houseNumber}\b`));
+  if (at < 0) return null;
+  const m = clean.slice(at, at + 80).match(/\bCA(?:lifornia)?\.?,?\s+(9[0-6]\d{3})(?:-\d{4})?\b/i);
+  return m ? m[1] : null;
+}
+
 /** The address to geocode for a project, or null if there's none (or no city or ZIP to pair it with). */
 export function addressRequest(
   sch: string,
@@ -32,11 +41,14 @@ export function addressRequest(
   b: Boundaries,
 ): AddressRequest | null {
   let street: string | null = null;
+  let textZip: string | null = null;
   for (const field of FIELDS) {
     for (const d of newestFirst) {
-      const a = extractAddress(d[field] ?? '');
+      const text = d[field] ?? '';
+      const a = extractAddress(text);
       if (a) {
         street = a.street;
+        textZip = zipAfter(text, a.number);
         break;
       }
     }
@@ -44,6 +56,9 @@ export function addressRequest(
   }
   if (!street) return null;
   const places = listedPlaces(newestFirst, b);
+  // "3325 Myrtle Avenue, North Highlands, CA 95660": the ZIP written with the
+  // address beats the listed city (Sacramento), which the address may lie outside.
+  if (textZip) return { sch, query: { street, city: '', zip: textZip }, places };
   const city = places.cityAreas?.length === 1 ? places.cityAreas[0].name : '';
   const zip = newestFirst.map((d) => caZip(d.zip)).find((z) => z !== null) ?? '';
   if (!city && !zip) return null;

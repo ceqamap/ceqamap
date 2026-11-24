@@ -93,3 +93,12 @@ describe('attachPageInfo', () => {
     assert.equal(d.coordinates, '34.6, -120.2');
   });
 });
+
+describe('zipAfter', () => {
+  it('reads the ZIP written with an address', async () => {
+    const { zipAfter } = await import('../src/lib/addresses.ts');
+    assert.equal(zipAfter('The project is located at 3325 Myrtle Avenue, North Highlands, CA 95660', 3325), '95660');
+    assert.equal(zipAfter('17802 Del Puerto Canyon Road, Patterson, CA 95363', 17802), '95363');
+    assert.equal(zipAfter('3325 Myrtle Avenue near the 95660 sign', 3325), null);
+  });
+});
