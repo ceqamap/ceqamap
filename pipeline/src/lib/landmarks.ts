@@ -339,7 +339,7 @@ export function placeNameTest(b: Boundaries): (key: string) => boolean {
 export function landmarkTexts(docsNewestFirst: readonly CeqaDocument[]): string[] {
   const d = docsNewestFirst[0];
   if (!d) return [];
-  const texts = [d.projectTitle, d.documentTitle, d.description, d.crossStreets].map((t) => t?.trim());
+  const texts = [d.projectTitle, d.documentTitle, d.description, d.crossStreets, d.otherLocation].map((t) => t?.trim());
   return [...new Set(texts.filter((t): t is string => !!t))];
 }
 

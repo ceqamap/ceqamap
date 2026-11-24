@@ -9,6 +9,7 @@
     "backfill": "node src/jobs/backfill.ts",
     "build-data": "node src/jobs/build.ts",
     "publish-data": "node src/jobs/publish.ts",
+    "pages": "node src/jobs/pages.ts",
     "boundaries": "node scripts/fetch-boundaries.ts"
   },
   "dependencies": {

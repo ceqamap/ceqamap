@@ -17,7 +17,7 @@ import type { CeqaDocument } from './document.ts';
 import { type AddressQuery, type GeocodeCache, geocodeAll, queryKey } from './geocode.ts';
 import { type AddressPlacement, agreesWithPlaces, type ListedPlaces, listedPlaces } from './location.ts';
 
-const FIELDS = ['crossStreets', 'projectTitle', 'documentTitle', 'description'] as const;
+const FIELDS = ['crossStreets', 'otherLocation', 'projectTitle', 'documentTitle', 'description'] as const;
 
 export interface AddressRequest {
   sch: string;
@@ -34,7 +34,7 @@ export function addressRequest(
   let street: string | null = null;
   for (const field of FIELDS) {
     for (const d of newestFirst) {
-      const a = extractAddress(d[field]);
+      const a = extractAddress(d[field] ?? '');
       if (a) {
         street = a.street;
         break;

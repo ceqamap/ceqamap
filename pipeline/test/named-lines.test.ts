@@ -80,7 +80,7 @@ describe('resolveLines', () => {
   const index = (features: ShapefileFeature[], names: string[]) =>
     buildRoadIndex(features, new Set(names.flatMap((n) => [streetKeys(n)!.full, streetKeys(n)!.nodir])));
 
-  it('places a creek at its one road crossing, naming the road', () => {
+  it('places a creek at its one road crossing, approximately', () => {
     const water = [line('Quiota Crk', 'H3010', [-120.1, 34.5], [-120.1, 34.6])];
     const roads = [
       line('N Refugio Rd', 'S1400', [-120.12, 34.55], [-120.08, 34.55]),
@@ -94,8 +94,8 @@ describe('resolveLines', () => {
       () => buildRoadGrid(roads),
     );
     assert.ok(r.ok);
-    assert.equal(r.placement.kind, 'crossing');
-    assert.deepEqual(r.placement.kind === 'crossing' && r.placement.names, ['Quiota Creek', 'N Refugio Rd']);
+    assert.equal(r.placement.kind, 'along');
+    assert.deepEqual(r.placement.kind === 'along' && r.placement.names, ['Quiota Creek']);
     assert.ok(Math.abs(r.placement.lat - 34.55) < 1e-9);
   });
 

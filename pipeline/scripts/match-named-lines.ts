@@ -48,7 +48,7 @@ for (const [sch, list] of groupBySch(docs)) {
   if (lm.kind === 'placed') landmarks.set(sch, lm.placement);
   const d = newestFirst[0];
   const pm = placeAtPostmiles(
-    `${d.projectTitle}\n${d.description}\n${d.crossStreets}`,
+    `${d.projectTitle}\n${d.description}\n${d.crossStreets}\n${d.otherLocation ?? ''}`,
     listedPlaces(newestFirst, b).counties,
     pmTable,
   );

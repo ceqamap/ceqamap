@@ -43,7 +43,7 @@ Each project gets the best location available, in this order:
 | Address       | A street address in the project's text, geocoded by the Census         | Solid dot           |
 | Cross streets | Where the listed cross streets meet (Census road network)              | Dot, lighter center |
 | Postmile      | State highway postmiles in the project's text (Caltrans)               | Dot, lighter center |
-| Crossing      | Where roads or waterways named in the project's text cross             | Dot, lighter center |
+| Crossing      | Where two roads, or a road and a waterway, named in the text cross     | Dot, lighter center |
 | Named place   | A beach, island, pass, summit... named in the text (USGS GNIS)         | Dot, lighter center |
 | Street        | A seeded spot along the one listed (or named) short street or creek    | Hollow ring         |
 | Community     | A community named in the text (USGS GNIS)                              | Hollow ring         |
@@ -101,6 +101,18 @@ community (e.g. Ocotillo Wells, Studio City) as an approximate ring. On the full
 14,000 projects; a hand check of 70 looked right in roughly 8 of 10. GNIS no longer lists buildings, schools, parks,
 dams or airports (removed in 2022), so "Black Mountain Middle School" finds the summit, not the school.
 
+**Project pages ("Other Location Info").** The CSV export leaves out a free-text field that project pages on CEQAnet
+show, "Other Location Info", and some agencies put the real location only there: SCH 2026040250 has no coordinates or
+cross streets in the CSV, but its page says "just west of North Refugio Road ...; Latitude 34.581478, Longitude
+-120.108033". In a sample of 200 projects from the past 12 months that the CSV can't place exactly (2026‑11‑23), 55%
+had the field: a street address in about 17%, a relative description ("west of Hayride Road") in 9%, postmiles in 3%,
+coordinates in under 1%. The **Project pages** workflow (`jobs/pages.ts`, hourly) reads the pages of projects filed in
+the past 12 months that the CSV can't place exactly, one every 8 seconds, and keeps the field in `state/pages.json`; it
+refetches a page when the project gets a new filing. The build attaches it to the project's newest document, where the
+address, postmile, road and place steps read it like the rest of the text, and coordinates written in it fill an empty
+Coordinates field (then checked like any agency coordinates). Older projects are not read: about 300,000 pages would
+take weeks at this pace.
+
 **Highway postmiles.** Caltrans locates work on a state highway by county, route and postmile ("in San Diego County
 along SR 76 from PM R16.4 to R16.9", "11-SD-76 PM 16.4/16.9"); postmiles restart at each county line, and a letter
 prefix marks a realigned stretch. `postmiles.ts` reads a postmile only next to a route the text names (so "PM 89-24", a
@@ -116,7 +128,8 @@ linear water (streams, rivers, canals; also public domain). In order: two named 
 listed city or county give a **crossing**; a named place GNIS lists more than once in the county (two "Emigrant Pass"
 in Inyo) is **settled** by a named road within 20 km when the other same-name places are 40 km or more away; a named
 creek with the words crossing, bridge or culvert and no road named goes where it crosses a public road, if all such
-crossings are within 3 km (the one nearest their middle); and one named line that is short in the area gives a spot
+crossings are within 3 km (the one nearest their middle), but only as an approximate spot, because the bridge may be on
+a private road the Census doesn't map (SCH 2026040250's is 3 km from the public crossing); and one named line that is short in the area gives a spot
 **along** it (still approximate). Two waterways meeting are not a crossing: "Tramp Creek, tributary to the Middle Fork
 Eel River" is about the creek, so it is placed along the stretch of Tramp Creek that reaches that river.
 

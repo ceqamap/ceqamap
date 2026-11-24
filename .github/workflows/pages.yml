@@ -1,0 +1,55 @@
+name: Project pages
+
+# Reads "Other Location Info" from CEQAnet project pages, which the CSV export
+# leaves out (see pipeline/src/lib/pages.ts), for projects filed in the past
+# 12 months that the CSV can't place exactly. One page every 8 s, up to 50
+# minutes a run; progress is saved to state/pages.json and used by the next
+# data rebuild. The first pass takes about a day of hourly runs; after that a
+# run only picks up new filings.
+on:
+  schedule:
+    - cron: '41 * * * *'
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: 'Stop after this many minutes'
+        default: '50'
+
+concurrency:
+  group: project-pages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CEQANET_CONTACT: ${{ vars.CEQANET_CONTACT }}
+  R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+  R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+  R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+  R2_BUCKET: ${{ vars.R2_BUCKET }}
+
+jobs:
+  pages:
+    if: vars.R2_BUCKET != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 58
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install
+        run: |
+          if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile --filter @ceqa-atlas/pipeline...; else pnpm install --filter @ceqa-atlas/pipeline...; fi
+      - name: Restore city, county and ZIP boundaries
+        uses: actions/cache@v6
+        with:
+          path: pipeline/data/boundaries.json
+          key: boundaries-${{ hashFiles('pipeline/scripts/fetch-boundaries.ts', 'pipeline/src/lib/boundaries.ts', 'pipeline/src/lib/geometry.ts', 'pipeline/src/lib/shapefile.ts') }}
+      - name: Ensure city, county and ZIP boundaries
+        run: node pipeline/scripts/boundaries-current.ts || NODE_OPTIONS=--max-old-space-size=8192 pnpm --filter @ceqa-atlas/pipeline boundaries
+      - name: Fetch pages
+        run: pnpm --filter @ceqa-atlas/pipeline pages --minutes "${{ inputs.minutes || '50' }}"

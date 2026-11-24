@@ -26,6 +26,9 @@
    reprocess history without refetching.
    Documents seen for the first time are saved as the latest batch of arrivals (`state/arrivals.json`); runs with
    nothing new leave the previous batch in place.
+   Separately, the hourly **Project pages** job (`pages.ts`) reads "Other Location Info", which the CSV leaves out,
+   from the CEQAnet pages of projects filed in the past 12 months that the CSV can't place exactly
+   (`state/pages.json`; see DATA.md).
 2. **Build** (`build.ts`): read all partitions, group documents into projects, derive stage and location, and write
    per‑project JSON plus one point file per time window (30 days, 12 months, 5 years, all time) that tippecanoe turns
    into clustered tilesets. Clusters sum per‑stage counts so the legend's stage filter needs no extra tiles.

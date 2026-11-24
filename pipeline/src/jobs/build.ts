@@ -34,6 +34,7 @@ import { type Gazetteer, landmarkFor, placeNameTest } from '../lib/landmarks.ts'
 import { type AddressPlacement, type LocationHints, listedPlaces, resolveLocation } from '../lib/location.ts';
 import { log } from '../lib/log.ts';
 import { lineRequest, type LineRequest } from '../lib/namedLines.ts';
+import { attachPageInfo, loadPages } from '../lib/pages.ts';
 import { placeAtPostmiles, type PostmileTable } from '../lib/postmiles.ts';
 import { countyFips, countyRoads, countyWater } from '../lib/tiger.ts';
 import { listPartitionMonths, readPartition } from '../lib/partitions.ts';
@@ -61,6 +62,10 @@ if (!postmileTable) log.warn('No postmiles.json; skipping postmile placement', {
 const docs: CeqaDocument[] = [];
 for (const month of await listPartitionMonths(storage)) docs.push(...(await readPartition(storage, month)));
 if (docs.length === 0) throw new Error('No documents in storage. Run backfill first.');
+// "Other Location Info" from project pages (the CSV leaves it out), attached
+// to each project's newest document before anything reads them (see pages.ts).
+const pageStats = attachPageInfo(groupBySch(docs).values(), await loadPages(storage));
+log.info('Page location info', pageStats);
 
 const builtAt = new Date().toISOString();
 const today = todayInCalifornia();
@@ -88,7 +93,7 @@ for (const [sch, list] of groupBySch(docs)) {
   if (postmileTable) {
     const d = newestFirst[0];
     const r = placeAtPostmiles(
-      `${d.projectTitle}\n${d.description}\n${d.crossStreets}`,
+      `${d.projectTitle}\n${d.description}\n${d.crossStreets}\n${d.otherLocation ?? ''}`,
       listedPlaces(newestFirst, boundaries).counties,
       postmileTable,
     );
@@ -191,6 +196,7 @@ log.info('Aggregated', {
   addresses: addressStats,
   landmarks: landmarkStats,
   postmiles: postmileStats,
+  pages: pageStats,
   namedLines: lineStats,
   scopes: Object.fromEntries(TIME_SCOPES.map((s) => [s.id, scopes[s.id].counts.mapped])),
   arrivals: arrivals.published

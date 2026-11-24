@@ -19,9 +19,10 @@
  *   2. place      A place name with several same-name places in the county
  *                 (two "Emigrant Pass" in Inyo County) settled by a named
  *                 road: the one place within NEAR_LINE_KM of it.
- *   3. crossing   A named waterway and the words crossing, bridge or culvert,
+ *   3. along      A named waterway and the words crossing, bridge or culvert,
  *                 with no road named: where the waterway crosses a public
  *                 road, if every such crossing in the area is one place.
+ *                 Approximate: the bridge may be on a private road.
  *   4. along      Exactly one named line, short inside the area (see
  *                 placeAlongLines): a spot along it. Still approximate. A
  *                 creek named as a tributary of another named waterway counts
@@ -272,7 +273,7 @@ export function lineRequest(
 ): LineRequest | null {
   const d = newestFirst[0];
   if (!d) return null;
-  const t = textLines([d.projectTitle, d.description], isPlaceName);
+  const t = textLines([d.projectTitle, d.description, d.otherLocation ?? ''], isPlaceName);
   const seen = new Set<string>();
   const roads = [...crossStreetNames, ...t.roads].filter((n) => {
     const k = streetKeys(n)?.full;
@@ -438,9 +439,10 @@ export function resolveLines(
           lat: inArea.reduce((s, p) => s + p.lat, 0) / inArea.length,
         };
         const best = inArea.reduce((a, p) => (haversineKm(p, mid) < haversineKm(a, mid) ? p : a));
-        const roadsNamed = [...new Set(inArea.map((p) => p.road).filter(Boolean))];
-        const road = roadsNamed.length === 1 ? roadsNamed[0] : best.road || 'a road';
-        return { ok: true, placement: { kind: 'crossing', lon: best.lon, lat: best.lat, names: [w.name, road] } };
+        // Approximate, not a crossing: the bridge or culvert may be on a ranch
+        // road the Census doesn't map (SCH 2026040250's is 3 km from the
+        // public-road crossing).
+        return { ok: true, placement: { kind: 'along', lon: best.lon, lat: best.lat, names: [w.name] } };
       }
     }
   }

@@ -30,6 +30,12 @@ export interface CeqaDocument {
   projectIssues: string;
   exemptStatus: string;
   nodApprovedDate: string | null;
+  /**
+   * "Other Location Info" from the project's CEQAnet page (not in the CSV
+   * export). Attached in memory by the build to the project's newest document;
+   * never stored in partitions. See pages.ts.
+   */
+  otherLocation?: string;
 }
 
 /** "10/14/2025" or "10/14/2025 12:00:00 AM" -> "2025-10-14". */
