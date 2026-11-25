@@ -11,7 +11,7 @@
  * listed places, 1% geocoded somewhere that contradicted them (rejected) and
  * 22% weren't found by the Census.
  */
-import { caZip, extractAddress } from './address.ts';
+import { caZip, extractAddress, forAddresses } from './address.ts';
 import type { Boundaries } from './boundaries.ts';
 import type { CeqaDocument } from './document.ts';
 import { type AddressQuery, type GeocodeCache, geocodeAll, queryKey } from './geocode.ts';
@@ -27,7 +27,7 @@ export interface AddressRequest {
 
 /** A California ZIP code written within 80 characters after the house number, as in "123 Main St, Town, CA 95660". */
 export function zipAfter(text: string, houseNumber: number): string | null {
-  const clean = text.replace(/\s+/g, ' ');
+  const clean = forAddresses(text);
   const at = clean.search(new RegExp(String.raw`\b${houseNumber}\b`));
   if (at < 0) return null;
   const m = clean.slice(at, at + 80).match(/\bCA(?:lifornia)?\.?,?\s+(9[0-6]\d{3})(?:-\d{4})?\b/i);

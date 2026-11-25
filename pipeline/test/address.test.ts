@@ -17,6 +17,14 @@ describe('extractAddress', () => {
     assert.equal(street('ENV-2013-2239-MND / 15275 W. De Pauw Street'), '15275 W. De Pauw Street');
   });
 
+  it('reads past underscores in file-name-style titles (SCH 2026021010)', () => {
+    assert.equal(
+      street('PSH Outdoor Recreational & Accessibility Improvements program_5050 W. Pico Blvd., Los Angeles, CA 90019'),
+      '5050 W. Pico Blvd',
+    );
+    assert.equal(street('Project_Site_1234_Main_St'), '1234 Main St');
+  });
+
   it('ignores highways, quantities and years', () => {
     assert.equal(street('Olive Mill Rd. and Hot Springs Road'), null);
     assert.equal(street('101 Freeway and Main St'), null);
