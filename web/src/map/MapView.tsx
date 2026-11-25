@@ -62,6 +62,9 @@ export type HoverInfo =
       several: boolean;
     };
 
+/** Zoom for a project opened from a link: streets are labeled and clusters have split (cluster-maxzoom is 12). */
+const LINK_ZOOM = 15;
+
 /** A selected project known only to an area: outline these, in this color. */
 export interface SelectedArea {
   keys: string[];
@@ -480,9 +483,8 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
         );
       return;
     }
-    if (!map.getBounds().contains([lon, lat]) || map.getZoom() < 9) {
-      map.flyTo({ center: [lon, lat], zoom: Math.max(map.getZoom(), 12), duration });
-    }
+    // Street level, past the cluster zoom, so the selected dot itself shows.
+    map.flyTo({ center: [lon, lat], zoom: Math.max(map.getZoom(), LINK_ZOOM), duration });
   }, [props.focus]);
 
   function setHovered(map: MapLibreMap, f: MapGeoJSONFeature | null) {
