@@ -96,11 +96,6 @@ describe('anchors', () => {
     const q = interiorPoint(B.places.elbow.shape, B.places.elbow.bbox);
     assert.deepEqual(p, q);
   });
-
-  it('puts county badges at the county seat', () => {
-    assert.deepEqual(anchors.countyBadge('fresno'), { lon: -119.7871, lat: 36.7378 });
-    assert.deepEqual(anchors.countyBadge('inyo'), { lon: -118.2001, lat: 36.8027 });
-  });
 });
 
 describe('spiral', () => {
@@ -129,8 +124,8 @@ describe('area tiles', () => {
     latest,
   });
 
-  it('makes dots around the anchor, an area badge and a county badge with stage counts', () => {
-    const f = areaTileFeatures(
+  it('puts each project in the clusters up to z10 and in the sunflower from z11, newest in the middle', () => {
+    const { dots, clustered } = areaTileFeatures(
       [
         member('a', 'exempt', '2026-01-01'),
         member('b', 'in_review', '2026-03-01'),
@@ -139,24 +134,22 @@ describe('area tiles', () => {
       B,
       anchors,
     );
-    const dots = f.filter((x) => x.properties.f === 'd');
     assert.deepEqual(
       dots.map((d) => d.properties.id),
       ['b', 'c', 'a'],
     );
     assert.deepEqual(dots[0].tippecanoe, { minzoom: 11 });
     assert.equal(dots[0].properties.an, 'Fresno');
-    const badge = f.find((x) => x.properties.f === 'b')!;
-    assert.deepEqual(badge.geometry.coordinates, [-119.7871, 36.7378]);
-    assert.deepEqual(badge.tippecanoe, { minzoom: 8, maxzoom: 10 });
-    assert.equal(badge.properties.total, 3);
-    assert.equal(badge.properties.c_exempt, 2);
-    assert.equal(badge.properties.c_in_review, 1);
-    assert.equal(badge.properties.r, 1);
-    const county = f.find((x) => x.properties.f === 'c')!;
-    assert.equal(county.properties.an, 'Fresno County');
-    assert.deepEqual(county.tippecanoe, { maxzoom: 7 });
-    assert.equal(county.properties.total, 3);
+    assert.equal(dots[0].properties.c_in_review, 1);
+    assert.deepEqual(
+      clustered.map((d) => d.tippecanoe),
+      [{ maxzoom: 10 }, { maxzoom: 10 }, { maxzoom: 10 }],
+    );
+    // Same spot in both, so clusters split apart into the sunflower.
+    assert.deepEqual(
+      clustered.map((d) => d.geometry.coordinates),
+      dots.map((d) => d.geometry.coordinates),
+    );
   });
 
   it('emits outlines keyed like published areas', () => {

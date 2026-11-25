@@ -24,11 +24,7 @@ export function HoverCard({
   if (info.kind === 'cluster') {
     return (
       <div className="hover-card card" style={style} role="tooltip">
-        <p className="hover-title">
-          {formatNumber(info.count)} {info.count === 1 ? 'project' : 'projects'}
-          {info.area ? ` somewhere in ${info.area}` : ''}
-        </p>
-        {info.area && <p className="hover-meta">Located only to the area, not a spot</p>}
+        <p className="hover-title">{formatNumber(info.count)} projects</p>
         <p className="hover-meta">
           {info.inReview > 0 ? (
             <>

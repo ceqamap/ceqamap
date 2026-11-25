@@ -47,24 +47,25 @@ Each project gets the best location available, in this order:
 | Named place   | A beach, island, pass, summit... named in the text (USGS GNIS)         | Dot, lighter center |
 | Street        | A seeded spot along the one listed (or named) short street or creek    | Hollow ring         |
 | Community     | A community named in the text (USGS GNIS)                              | Hollow ring         |
-| ZIP code      | Only the listed ZIP (smaller than the listed city): grouped by area    | Area badge / spiral |
-| City          | Only the listed city: grouped by area                                  | Area badge / spiral |
-| County        | Only the listed county: grouped by area                                | Area badge / spiral |
-| Region        | Only 2–3 neighboring listed counties: grouped by area                  | Area badge / spiral |
+| ZIP code      | Only the listed ZIP (smaller than the listed city): grouped by area    | Sunflower (z11+)    |
+| City          | Only the listed city: grouped by area                                  | Sunflower (z11+)    |
+| County        | Only the listed county: grouped by area                                | Sunflower (z11+)    |
+| Region        | Only 2–3 neighboring listed counties: grouped by area                  | Sunflower (z11+)    |
 | None          | Statewide, or counties far apart                                       | Not mapped; counted |
 
 Only about 11% of projects (38,000 of 335,000) have agency coordinates; nothing before roughly 2010 does.
 **Most points on the map are approximate**, and say so with a hollow ring and a line in the drawer.
 
 **Projects known only to an area** (about 59% of mapped projects) are not given a spot of their own. Until
-2026‑11‑24 they were scattered at a seeded random spot inside the area, which read as a real site. Now
-(`areas.ts`) each area has an anchor (a city's GNIS populated-place point, i.e. its downtown, else the point deepest
-inside the outline; a county badge sits at the county seat), and an area tileset per time window holds, by zoom: a
-badge per county (z3–7), a badge per city, ZIP code or county area (z8–10), and each project as a dot in a sunflower
-spiral around the anchor, newest filing in the middle (z11+, 210 m step, ~12 px apart at z11). Selecting one shows the
-area's outline (boundaries tileset, property `k` = "city:fresno", "zip:95660", "county:inyo") and the drawer says
-"Somewhere in Fresno". The published `location.area` carries the name, boundary keys and bounding box; lon/lat is the
-anchor. Known gaps: spirals of neighboring areas can overlap at zoom 11–12, and outlines fill a city's enclaves.
+2026‑11‑24 they were scattered at a seeded random spot inside the area, which read as a real site. Now (`areas.ts`)
+each area has an anchor (a city's GNIS populated-place point, i.e. its downtown, else the point deepest inside the
+outline) and its projects are laid out in a sunflower spiral around it, newest filing in the middle (210 m step, ~12 px
+apart at z11). Up to z10 they sit in the ordinary clusters at those positions, so the zoomed-out map looks as before;
+from z11 the area tileset shows them unclustered. (Count badges per county and per city were tried on the preview and
+dropped: with the clusters underneath they cluttered the map.) Selecting one shows the area's outline (boundaries
+tileset, property `k` = "city:fresno", "zip:95660", "county:inyo") and the drawer says "Somewhere in Fresno · Only the
+city is listed". The published `location.area` carries the name, boundary keys and bounding box; lon/lat is the anchor.
+Known gaps: sunflowers of neighboring areas can overlap at zoom 11–12, and outlines fill a city's enclaves.
 
 How placement works, and why (lessons from the first full build, 2026‑11‑20):
 

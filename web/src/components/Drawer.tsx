@@ -47,18 +47,12 @@ const FALLBACK_PHRASE: Record<LocationPrecision, string> = {
   region: 'somewhere in its listed counties',
 };
 
-/** "the city", "the cities", "the ZIP code", "the county", "the counties". */
+/** "Only the city is listed", "Only the ZIP code is listed", "Only the counties are listed". */
 function areaPhrase(area: PublishedArea): string {
   const many = area.keys.length > 1;
-  return area.kind === 'zip'
-    ? 'the ZIP code'
-    : area.kind === 'city'
-      ? many
-        ? 'the cities'
-        : 'the city'
-      : many
-        ? 'the counties'
-        : 'the county';
+  const what =
+    area.kind === 'zip' ? 'ZIP code' : area.kind === 'city' ? (many ? 'cities' : 'city') : many ? 'counties' : 'county';
+  return `Only the ${what} ${many ? 'are' : 'is'} listed`;
 }
 
 export function Drawer({ sch, mode, onClose, onLoaded }: Props) {
@@ -184,9 +178,7 @@ function ProjectDetail({
       {p.location?.area ? (
         <p className="drawer-place">
           Somewhere in {p.location.area.name}
-          <span className="muted">
-            {' · '}Location given only as {areaPhrase(p.location.area)}
-          </span>
+          <span className="muted"> · {areaPhrase(p.location.area)}</span>
         </p>
       ) : (
         (place || p.location) && (

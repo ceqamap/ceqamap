@@ -10,7 +10,6 @@ import {
   AREA_SOURCE,
   AREA_SOURCE_LAYER,
   applyAreaStages,
-  badgeCounts,
   ensureAreaLayers,
   OUTLINE_SOURCE,
   showAreaOutline,
@@ -43,8 +42,6 @@ export type HoverInfo =
       count: number;
       inReview: number;
       arrived: number;
-      /** For area badges: the area ("Fresno"), whose projects have no spot of their own. */
-      area?: string;
     };
 
 /** A selected project known only to an area: outline these, in this color. */
@@ -58,7 +55,7 @@ export interface MapViewProps {
   basemap: Basemap;
   /** Absolute URL of the current .pmtiles file, or null while loading. */
   tilesUrl: string | null;
-  /** Absolute URL of the current area tileset (badges and spirals), if the data has one. */
+  /** Absolute URL of the current area tileset (the sunflowers from z11), if the data has one. */
   areaTilesUrl: string | null;
   /** Absolute URL of the city, ZIP and county outlines tileset, if the data has one. */
   boundariesUrl: string | null;
@@ -224,15 +221,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
         setHovered(map!, f && !f.properties.point_count ? f : null);
         map!.getCanvas().style.cursor = f ? 'pointer' : '';
         if (!f) return latest.current.onHover(null);
-        if (f.properties.f === 'b' || f.properties.f === 'c') {
-          latest.current.onHover({
-            kind: 'cluster',
-            x: e.point.x,
-            y: e.point.y,
-            ...badgeCounts(f.properties, latest.current.stages),
-            area: String(f.properties.an),
-          });
-        } else if (f.properties.point_count) {
+        if (f.properties.point_count) {
           latest.current.onHover({
             kind: 'cluster',
             x: e.point.x,
@@ -257,22 +246,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
         const f = map!.queryRenderedFeatures(e.point, { layers: interactiveLayers(map!) })[0] as
           MapGeoJSONFeature | undefined;
         if (!f) return latest.current.onSelect(null);
-        const duration = prefersReducedMotion() ? 0 : 700;
-        if (f.properties.f === 'c') {
-          // County badge: frame the county, where its city and ZIP badges take over.
-          const { w, s, e: east, nb } = f.properties as Record<string, number>;
-          map!.fitBounds(
-            [
-              [w, s],
-              [east, nb],
-            ],
-            { padding: fitPadding(), maxZoom: 9.5, duration },
-          );
-        } else if (f.properties.f === 'b') {
-          // Area badge: zoom in on its downtown, where the projects spread out as dots.
-          const [lon, lat] = (f.geometry as { coordinates: [number, number] }).coordinates;
-          map!.easeTo({ center: [lon, lat], zoom: Math.max(map!.getZoom() + 1, 12), duration });
-        } else if (f.properties.point_count) {
+        if (f.properties.point_count) {
           const [lon, lat] = (f.geometry as { coordinates: [number, number] }).coordinates;
           map!.easeTo({
             center: [lon, lat],
@@ -476,7 +450,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
   return <div ref={container} className="map" role="region" aria-label="Map of CEQA projects" />;
 });
 
-/** Set state on a project (or area badge) in whichever source holds it. */
+/** Set state on a project in whichever source holds it. */
 function setFeature(map: MapLibreMap, id: string, state: Record<string, boolean>) {
   for (const [source, sourceLayer] of [
     [SOURCE_ID, SOURCE_LAYER],

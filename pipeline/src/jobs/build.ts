@@ -176,7 +176,7 @@ await rm(OUT, { recursive: true, force: true });
 await mkdir(join(OUT, 'projects'), { recursive: true });
 
 // Per window: points with a place of their own go to the clustered tileset;
-// projects known only to an area go to the area tileset (badges and spirals).
+// projects known only to an area go to both (see below).
 const projectArea = new Map<string, PlacementArea>();
 const latestFiling = lastFilingDates(result.projects);
 for (const p of result.projects) {
@@ -192,9 +192,12 @@ for (const scope of TIME_SCOPES) {
     if (area) members.push({ point: f, area, latest: latestFiling.get(f.properties.id) ?? '' });
     else own.push(JSON.stringify(f));
   }
+  // Area projects: in the clusters up to z10 (so the zoomed-out map looks as
+  // before), then as an unclustered sunflower (see areas.ts).
+  const { dots, clustered } = areaTileFeatures(members, boundaries, anchors);
+  for (const f of clustered) own.push(JSON.stringify(f));
   await writeFile(join(OUT, `points-${scope.id}.ndjson`), own.join('\n') + '\n');
-  const features = areaTileFeatures(members, boundaries, anchors);
-  await writeFile(join(OUT, `areas-${scope.id}.ndjson`), features.map((f) => JSON.stringify(f)).join('\n') + '\n');
+  await writeFile(join(OUT, `areas-${scope.id}.ndjson`), dots.map((f) => JSON.stringify(f)).join('\n') + '\n');
   areaStats[scope.id] = members.length;
 }
 {
@@ -283,7 +286,7 @@ for (const scope of TIME_SCOPES) {
   if (tippecanoe.error) throw new Error(`tippecanoe could not start: ${tippecanoe.error.message}`);
   if (tippecanoe.status !== 0) throw new Error(`tippecanoe exited with ${tippecanoe.status} (${scope.id})`);
 
-  // Area badges and spirals: no clustering (each feature has its own zoom range, see areas.ts).
+  // The area sunflowers from z11: no clustering (see areas.ts).
   runTippecanoe(`areas ${scope.id}`, [
     '--output',
     join(OUT, `areas-${scope.id}.pmtiles`),
@@ -293,7 +296,7 @@ for (const scope of TIME_SCOPES) {
     '--name',
     `CEQA projects by area (${scope.label})`,
     '--minimum-zoom',
-    '3',
+    '11',
     '--maximum-zoom',
     '14',
     '--drop-rate',
