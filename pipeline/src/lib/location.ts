@@ -55,6 +55,21 @@ export interface ResolvedLocation {
   landmark?: string;
   /** For `postmile`: route and postmiles, e.g. "SR 76, PM R16.4–R16.9". */
   postmile?: string;
+  /**
+   * For `zip`, `city`, `county` and `region`: the area the record gives, and
+   * nothing finer. The map groups these by area instead of inventing a spot
+   * (see areas.ts); lon/lat is still a seeded spot inside it, for tools that
+   * want a point.
+   */
+  area?: PlacementArea;
+}
+
+export interface PlacementArea {
+  kind: 'zip' | 'city' | 'county';
+  /** Boundary keys: ZIP codes, or normalized city or county names (keys of Boundaries). */
+  keys: string[];
+  /** For people: "Fresno", "Fresno and Clovis", "95660", "Inyo County". */
+  name: string;
 }
 
 export interface AddressPlacement {
@@ -106,6 +121,15 @@ function maxSpreadKm(areas: Area[]): number {
   for (let i = 0; i < areas.length; i++)
     for (let j = i + 1; j < areas.length; j++) m = Math.max(m, haversineKm(center(areas[i]), center(areas[j])));
   return m;
+}
+
+/** The boundary keys and a display name for areas found in `table`. */
+function areaOf(kind: 'city' | 'county', areas: Area[], table: Record<string, Area>): PlacementArea {
+  const keys = areas.map((a) => Object.keys(table).find((k) => table[k] === a) ?? normalizePlaceName(a.name));
+  const names = areas.map((a) => a.name);
+  const joined = names.length <= 2 ? names.join(' and ') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+  const name = kind === 'city' ? joined : names.length === 1 ? `${joined} County` : `${joined} counties`;
+  return { kind, keys, name };
 }
 
 function lookup(names: string[], table: Record<string, Area>): Area[] | null {
@@ -258,7 +282,10 @@ export function resolveLocation(
   }
 
   const zipPoint = placeInZip(sch, docsNewestFirst, places, b);
-  if (zipPoint) return { ...zipPoint, precision: 'zip', coordinatesRejected };
+  if (zipPoint) {
+    const area: PlacementArea = { kind: 'zip', keys: [zipPoint.zip], name: zipPoint.zip };
+    return { lon: zipPoint.lon, lat: zipPoint.lat, precision: 'zip', coordinatesRejected, area };
+  }
 
   if (!placeDoc) return null;
   const rand = seededRandom(sch);
@@ -267,7 +294,7 @@ export function resolveLocation(
     const found = cityAreas;
     if (maxSpreadKm(found) <= MAX_CITY_SPREAD_KM) {
       const p = placeWithin(found, rand);
-      if (p) return { ...p, precision: 'city', coordinatesRejected };
+      if (p) return { ...p, precision: 'city', coordinatesRejected, area: areaOf('city', found, b.places) };
     }
   }
 
@@ -275,7 +302,13 @@ export function resolveLocation(
     const found = countyAreas ?? lookup(counties, b.counties);
     if (found && maxSpreadKm(found) <= MAX_COUNTY_SPREAD_KM) {
       const p = placeWithin(found, rand);
-      if (p) return { ...p, precision: found.length === 1 ? 'county' : 'region', coordinatesRejected };
+      if (p)
+        return {
+          ...p,
+          precision: found.length === 1 ? 'county' : 'region',
+          coordinatesRejected,
+          area: areaOf('county', found, b.counties),
+        };
     }
   }
 
@@ -295,7 +328,7 @@ function placeInZip(
   docsNewestFirst: readonly CeqaDocument[],
   places: ListedPlaces,
   b: Boundaries,
-): { lon: number; lat: number } | null {
+): { lon: number; lat: number; zip: string } | null {
   if (!b.zips) return null;
   const zip = docsNewestFirst.map((d) => caZip(d.zip)).find((z) => z !== null);
   const area = zip ? b.zips[zip] : undefined;
@@ -307,7 +340,8 @@ function placeInZip(
   for (let i = 0; i < ZIP_TRIES; i++) {
     const p = samplePointInShape(target.shape, target.bbox, rand, 200);
     if (!p) return null;
-    if (!within || within.some((a) => inBBox(p.lon, p.lat, a.bbox) && pointInShape(p.lon, p.lat, a.shape))) return p;
+    if (!within || within.some((a) => inBBox(p.lon, p.lat, a.bbox) && pointInShape(p.lon, p.lat, a.shape)))
+      return { ...p, zip: zip! };
   }
   return null;
 }

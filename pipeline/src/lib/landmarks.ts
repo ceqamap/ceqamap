@@ -40,6 +40,12 @@ export interface Gazetteer {
   source: string;
   /** Normalized name -> features with that name. */
   names: Record<string, GazetteerFeature[]>;
+  /**
+   * Town and city points (classes Populated Place and Civil), one-word names
+   * included, for anchoring areas on the map (see areas.ts). Not used to match
+   * project text: one-word names are too ambiguous for that.
+   */
+  towns?: Record<string, GazetteerFeature[]>;
 }
 
 export interface GazetteerFeature {
@@ -167,21 +173,29 @@ export function parseGnis(text: string, source: string, keepClasses = CLASS_RANK
   const iState = header.indexOf('state_name');
 
   const names: Record<string, GazetteerFeature[]> = {};
+  const towns: Record<string, GazetteerFeature[]> = {};
   for (let i = 1; i < lines.length; i++) {
     if (!lines[i]) continue;
     const f = lines[i].split('|');
     if (iState >= 0 && f[iState] && f[iState] !== 'California') continue;
     const c = f[iClass];
-    if (!(c in keepClasses)) continue;
+    const town = c === 'Populated Place' || c === 'Civil';
+    if (!(c in keepClasses) && !town) continue;
     const lat = Number(f[iLat]);
     const lon = Number(f[iLon]);
     if (!lat || !lon) continue; // GNIS uses 0 for unknown
     const n = f[iName].trim();
+    if (town) {
+      const t = { n, c, k: normalizePlaceName(f[iCounty] ?? ''), lon, lat };
+      // "City of Fresno" (Civil) and "Fresno" (Populated Place) both anchor Fresno.
+      (towns[normalizePlaceName(n)] ??= []).push(t);
+    }
+    if (!(c in keepClasses)) continue;
     if (n.split(/\s+/).length < 2) continue; // see "Deliberately strict" above
     const key = normalizeName(n);
     (names[key] ??= []).push({ n, c, k: normalizePlaceName(f[iCounty] ?? ''), lon, lat });
   }
-  return { source, names };
+  return { source, names, towns };
 }
 
 export interface NameMention {

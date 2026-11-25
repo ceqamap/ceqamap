@@ -4,6 +4,17 @@ import { Protocol } from 'pmtiles';
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import type { MapMark, ProjectStatus, TilePointProperties } from '../../../packages/shared/src/index.ts';
 import { pingProgress } from '../lib/motion.ts';
+import {
+  AREA_INTERACTIVE,
+  AREA_LAYER,
+  AREA_SOURCE,
+  AREA_SOURCE_LAYER,
+  applyAreaStages,
+  badgeInfo,
+  ensureAreaLayers,
+  OUTLINE_SOURCE,
+  showAreaOutline,
+} from './areaLayers.ts';
 import { type Basemap, type BasemapId, GLYPHS } from './basemaps.ts';
 import { BasemapWatch, type MapErrorLike } from './basemapWatch.ts';
 import {
@@ -19,7 +30,7 @@ import {
 } from './layers.ts';
 
 /** Our own data sources: their errors are ours to report, not a basemap outage. */
-const DATA_SOURCES = [SOURCE_ID, 'areas', 'area-outlines'];
+const DATA_SOURCES = [SOURCE_ID, AREA_SOURCE, OUTLINE_SOURCE];
 
 /** California, with room for the header and legend. */
 export const CALIFORNIA_BOUNDS: [[number, number], [number, number]] = [
@@ -29,19 +40,52 @@ export const CALIFORNIA_BOUNDS: [[number, number], [number, number]] = [
 
 export type HoverInfo =
   | { kind: 'point'; x: number; y: number; props: TilePointProperties }
-  | { kind: 'cluster'; x: number; y: number; count: number; inReview: number; arrived: number };
+  | {
+      kind: 'cluster';
+      x: number;
+      y: number;
+      count: number;
+      inReview: number;
+      arrived: number;
+    }
+  | {
+      /** A city, ZIP code or county badge: projects known only to that area. */
+      kind: 'area';
+      x: number;
+      y: number;
+      name: string;
+      count: number;
+      inReview: number;
+      arrived: number;
+      /** What the records list: a city, a ZIP code, a county; `several` for "cities", "counties". */
+      listed: 'city' | 'zip' | 'county';
+      several: boolean;
+    };
+
+/** A selected project known only to an area: outline these, in this color. */
+export interface SelectedArea {
+  keys: string[];
+  bbox: [number, number, number, number];
+  color: string;
+}
 
 export interface MapViewProps {
   basemap: Basemap;
   /** Absolute URL of the current .pmtiles file, or null while loading. */
   tilesUrl: string | null;
+  /** Absolute URL of the current area tileset (the sunflowers from z11), if the data has one. */
+  areaTilesUrl: string | null;
+  /** Absolute URL of the city, ZIP and county outlines tileset, if the data has one. */
+  boundariesUrl: string | null;
+  /** The selected project's area, when it is known only to one. */
+  selectedArea: SelectedArea | null;
   /** Stages the legend shows. */
   stages: readonly ProjectStatus[];
   /** Locations (map marks) the legend shows. */
   marks: readonly MapMark[];
   selected: string | null;
-  /** Fly here when a project is opened from a link and is off-screen. */
-  focus: { lon: number; lat: number } | null;
+  /** Fly here when a project is opened from a link and is off-screen; frame `bbox` if given (an area). */
+  focus: { lon: number; lat: number; bbox?: [number, number, number, number] } | null;
   onHover: (info: HoverInfo | null) => void;
   onSelect: (sch: string | null) => void;
   onError: (message: string) => void;
@@ -74,6 +118,11 @@ function registerPmtiles() {
 
 const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+/** Clickable layers present on the map (area layers exist only with area data). */
+function interactiveLayers(map: MapLibreMap): string[] {
+  return [...AREA_INTERACTIVE, ...INTERACTIVE_LAYERS].filter((id) => map.getLayer(id));
+}
+
 export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(props, ref) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -83,6 +132,8 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
   const hoveredId = useRef<string | null>(null);
   const appliedSelected = useRef<string | null>(null);
   const appliedTiles = useRef<string | null>(null);
+  const appliedAreaTiles = useRef<string | null>(null);
+  const appliedBoundaries = useRef<string | null>(null);
   const basemapWatch = useRef(
     new BasemapWatch(DATA_SOURCES, () => latest.current.onBasemapDown(latest.current.basemap.id)),
   );
@@ -184,19 +235,26 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       });
       map.on('error', (e) => {
         // Missing tiles at the edges are normal; only surface source failures.
-        if ((e as { sourceId?: string }).sourceId === SOURCE_ID)
-          latest.current.onError('Some map data failed to load.');
+        const source = (e as { sourceId?: string }).sourceId;
+        if (source === SOURCE_ID || source === AREA_SOURCE) latest.current.onError('Some map data failed to load.');
         // The basemap's own host failing: switch to its fallback.
         if (latest.current.basemap.fallback) basemapWatch.current.report(e as MapErrorLike);
       });
 
       map.on('mousemove', (e) => {
-        const f = map!.queryRenderedFeatures(e.point, { layers: INTERACTIVE_LAYERS })[0] as
+        const f = map!.queryRenderedFeatures(e.point, { layers: interactiveLayers(map!) })[0] as
           MapGeoJSONFeature | undefined;
-        setHovered(map!, f && !f.properties.point_count ? String(f.properties.id) : null);
+        setHovered(map!, f && !f.properties.point_count ? f : null);
         map!.getCanvas().style.cursor = f ? 'pointer' : '';
         if (!f) return latest.current.onHover(null);
-        if (f.properties.point_count) {
+        if (f.properties.f === 'b') {
+          latest.current.onHover({
+            kind: 'area',
+            x: e.point.x,
+            y: e.point.y,
+            ...badgeInfo(f.properties, latest.current.stages),
+          });
+        } else if (f.properties.point_count) {
           latest.current.onHover({
             kind: 'cluster',
             x: e.point.x,
@@ -218,10 +276,18 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       });
 
       map.on('click', (e) => {
-        const f = map!.queryRenderedFeatures(e.point, { layers: INTERACTIVE_LAYERS })[0] as
+        const f = map!.queryRenderedFeatures(e.point, { layers: interactiveLayers(map!) })[0] as
           MapGeoJSONFeature | undefined;
         if (!f) return latest.current.onSelect(null);
-        if (f.properties.point_count) {
+        if (f.properties.f === 'b') {
+          // An area badge: zoom in on its downtown, where its projects spread out.
+          const [lon, lat] = (f.geometry as { coordinates: [number, number] }).coordinates;
+          map!.easeTo({
+            center: [lon, lat],
+            zoom: Math.max(map!.getZoom() + 1, 12),
+            duration: prefersReducedMotion() ? 0 : 700,
+          });
+        } else if (f.properties.point_count) {
           const [lon, lat] = (f.geometry as { coordinates: [number, number] }).coordinates;
           map!.easeTo({
             center: [lon, lat],
@@ -253,6 +319,14 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
               arrivalRadius(latest.current.stages, ping, latest.current.selected, latest.current.marks),
             );
             map!.setPaintProperty(LAYER.arrivals, 'circle-stroke-opacity', arrivalOpacity(ping));
+            if (map!.getLayer(AREA_LAYER.arrivals)) {
+              map!.setPaintProperty(
+                AREA_LAYER.arrivals,
+                'circle-radius',
+                arrivalRadius(latest.current.stages, ping, latest.current.selected, latest.current.marks),
+              );
+              map!.setPaintProperty(AREA_LAYER.arrivals, 'circle-stroke-opacity', arrivalOpacity(ping));
+            }
           }
         };
         raf = requestAnimationFrame(tick);
@@ -262,12 +336,16 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     function addDataLayers(m: MapLibreMap) {
       const { tilesUrl, basemap } = latest.current;
       if (!tilesUrl) return;
-      ensureProjectLayers(m, tilesUrl, {
-        mode: basemap.mode,
-        stages: latest.current.stages,
-        marks: latest.current.marks,
-      });
+      const theme = { mode: basemap.mode, stages: latest.current.stages, marks: latest.current.marks };
+      ensureProjectLayers(m, tilesUrl, theme);
       appliedTiles.current = tilesUrl;
+      const { areaTilesUrl, boundariesUrl, selectedArea } = latest.current;
+      if (areaTilesUrl) {
+        ensureAreaLayers(m, areaTilesUrl, boundariesUrl, theme, LAYER.pulse);
+        appliedAreaTiles.current = areaTilesUrl;
+        appliedBoundaries.current = boundariesUrl;
+        showAreaOutline(m, selectedArea);
+      }
       // Feature state does not survive a style change; restore the selection.
       hoveredId.current = null;
       if (appliedSelected.current) setFeature(m, appliedSelected.current, { selected: true });
@@ -324,6 +402,31 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     appliedTiles.current = props.tilesUrl;
   }, [props.tilesUrl, props.basemap.mode]);
 
+  // --- Area tiles and outlines: swap in place, or add once the data has them --
+  useEffect(() => {
+    const map = mapRef.current;
+    const { areaTilesUrl, boundariesUrl } = props;
+    if (!map || !styleReady.current || !areaTilesUrl || !map.getSource(SOURCE_ID)) return;
+    if (appliedAreaTiles.current === areaTilesUrl && appliedBoundaries.current === boundariesUrl) return;
+    const areas = map.getSource(AREA_SOURCE) as maplibregl.VectorTileSource | undefined;
+    const outlines = map.getSource(OUTLINE_SOURCE) as maplibregl.VectorTileSource | undefined;
+    if (areas && (outlines || !boundariesUrl)) {
+      areas.setUrl(`pmtiles://${areaTilesUrl}`);
+      if (outlines && boundariesUrl) outlines.setUrl(`pmtiles://${boundariesUrl}`);
+    } else {
+      ensureAreaLayers(
+        map,
+        areaTilesUrl,
+        boundariesUrl,
+        { mode: props.basemap.mode, stages: latest.current.stages, marks: latest.current.marks },
+        LAYER.pulse,
+      );
+      showAreaOutline(map, latest.current.selectedArea);
+    }
+    appliedAreaTiles.current = areaTilesUrl;
+    appliedBoundaries.current = boundariesUrl;
+  }, [props.areaTilesUrl, props.boundariesUrl, props.basemap.mode]);
+
   // --- Legend stage and location filters: restyle in place, no tile reload --
   const appliedFilters = useRef({ stages: props.stages, marks: props.marks });
   useEffect(() => {
@@ -334,6 +437,8 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     // Before the style is ready, style.load adds the layers with the latest filters.
     if (!map || !styleReady.current || !map.getSource(SOURCE_ID)) return;
     applyStages(map, { mode: props.basemap.mode, stages: props.stages, marks: props.marks });
+    if (map.getSource(AREA_SOURCE))
+      applyAreaStages(map, { mode: props.basemap.mode, stages: props.stages, marks: props.marks });
   }, [props.stages, props.marks, props.basemap.mode]);
 
   // --- Selection highlight -------------------------------------------------
@@ -346,17 +451,42 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     if (props.selected) setFeature(map, props.selected, { selected: true });
   }, [props.selected]);
 
+  // --- Selected project's area outline -------------------------------------
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !styleReady.current) return;
+    showAreaOutline(map, props.selectedArea);
+  }, [props.selectedArea]);
+
   // --- Fly to a project opened from a link ---------------------------------
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !props.focus) return;
-    const { lon, lat } = props.focus;
+    const { lon, lat, bbox } = props.focus;
+    const duration = prefersReducedMotion() ? 0 : 1600;
+    if (bbox) {
+      // Known only to an area: frame the area, not a spot we don't have.
+      const view = map.getBounds();
+      const inView = view.contains([bbox[0], bbox[1]]) && view.contains([bbox[2], bbox[3]]);
+      const area = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1]);
+      const viewArea = (view.getEast() - view.getWest()) * (view.getNorth() - view.getSouth());
+      if (!inView || area < viewArea / 50)
+        map.fitBounds(
+          [
+            [bbox[0], bbox[1]],
+            [bbox[2], bbox[3]],
+          ],
+          { padding: fitPadding(), maxZoom: 13, duration },
+        );
+      return;
+    }
     if (!map.getBounds().contains([lon, lat]) || map.getZoom() < 9) {
-      map.flyTo({ center: [lon, lat], zoom: Math.max(map.getZoom(), 12), duration: prefersReducedMotion() ? 0 : 1600 });
+      map.flyTo({ center: [lon, lat], zoom: Math.max(map.getZoom(), 12), duration });
     }
   }, [props.focus]);
 
-  function setHovered(map: MapLibreMap, id: string | null) {
+  function setHovered(map: MapLibreMap, f: MapGeoJSONFeature | null) {
+    const id = f ? String(f.properties.id) : null;
     if (hoveredId.current === id) return;
     if (hoveredId.current) setFeature(map, hoveredId.current, { hover: false });
     if (id) setFeature(map, id, { hover: true });
@@ -366,11 +496,18 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
   return <div ref={container} className="map" role="region" aria-label="Map of CEQA projects" />;
 });
 
+/** Set state on a project in whichever source holds it. */
 function setFeature(map: MapLibreMap, id: string, state: Record<string, boolean>) {
-  try {
-    map.setFeatureState({ source: SOURCE_ID, sourceLayer: SOURCE_LAYER, id }, state);
-  } catch {
-    // Source not ready yet (e.g. mid style switch); the style.load handler restores it.
+  for (const [source, sourceLayer] of [
+    [SOURCE_ID, SOURCE_LAYER],
+    [AREA_SOURCE, AREA_SOURCE_LAYER],
+  ]) {
+    if (!map.getSource(source)) continue;
+    try {
+      map.setFeatureState({ source, sourceLayer, id }, state);
+    } catch {
+      // Source not ready yet (e.g. mid style switch); the style.load handler restores it.
+    }
   }
 }
 

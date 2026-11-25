@@ -41,6 +41,21 @@ for (const scope of TIME_SCOPES) {
   tileKeys.push(key);
   // Paths in meta.json are relative to the data origin.
   if (meta.scopes) meta.scopes[scope.id].tiles = key.slice(PREFIX.length + 1);
+  // Projects known only to an area (badges and spirals, see areas.ts).
+  const areaKey = `${PREFIX}/tiles/${tilesetName(meta.buildId, scope.id, 'areas')}`;
+  await storage.put(areaKey, await readFile(join(OUT, `areas-${scope.id}.pmtiles`)), {
+    contentType: 'application/vnd.pmtiles',
+    cacheControl: 'public, max-age=31536000, immutable',
+  });
+  if (meta.scopes) meta.scopes[scope.id].areaTiles = areaKey.slice(PREFIX.length + 1);
+}
+{
+  const key = `${PREFIX}/tiles/${tilesetName(meta.buildId, null, 'boundaries')}`;
+  await storage.put(key, await readFile(join(OUT, 'boundaries.pmtiles')), {
+    contentType: 'application/vnd.pmtiles',
+    cacheControl: 'public, max-age=31536000, immutable',
+  });
+  meta.boundaries = key.slice(PREFIX.length + 1);
 }
 log.info('Uploaded tiles', { tileKeys });
 

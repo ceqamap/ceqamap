@@ -120,10 +120,10 @@ export const PRECISION_LABEL: Readonly<Record<LocationPrecision, string>> = {
   landmark: 'Near a place named in the project description',
   street: 'Approximate: placed along a street or waterway the project names',
   community: 'Approximate: placed at the community named in the project description',
-  zip: 'Approximate: placed within the listed ZIP code',
-  city: 'Approximate: placed within the listed city',
-  county: 'Approximate: placed within the listed county',
-  region: 'Approximate: placed between the listed counties',
+  zip: 'Somewhere in the listed ZIP code',
+  city: 'Somewhere in the listed city',
+  county: 'Somewhere in the listed county',
+  region: 'Somewhere in the listed counties',
 };
 
 /** How each precision is drawn: 1 solid dot, 2 dot with a lighter center, 0 hollow ring. */
@@ -256,6 +256,14 @@ export interface PublishedProject {
     address?: string;
     /** For `landmark` and `community`: the named place used (USGS GNIS), e.g. "Shelter Island". */
     landmark?: string;
+    /**
+     * For `zip`, `city`, `county` and `region`: the area the record gives and
+     * nothing finer. The map shows these grouped by area, not at a spot of
+     * their own; lon/lat is the area's anchor (its downtown or most central
+     * point). `keys` match the `k` property of the boundaries tileset
+     * ("city:fresno", "zip:95660", "county:inyo").
+     */
+    area?: PublishedArea;
   } | null;
   facts: {
     totalAcres: number | null;
@@ -274,6 +282,8 @@ export interface PublishedProject {
 export interface PublishedMeta {
   /** Changes on every rebuild; used to bust tile caches. */
   buildId: string;
+  /** Path of the city, ZIP code and county outlines tileset (layer `areas`, property `k`). */
+  boundaries?: string;
   /** Git branch the data was built from (preview data only checks this). */
   ref?: string;
   builtAt: string;
@@ -301,9 +311,27 @@ export interface PublishedMeta {
 }
 
 /** A time window's tileset and the counts of what it shows (mapped projects only). */
+/** An area a project is located to (see PublishedProject.location.area). */
+export interface PublishedArea {
+  kind: 'zip' | 'city' | 'county';
+  /** "Fresno", "95660", "Inyo County". */
+  name: string;
+  /** Boundary feature ids in the boundaries tileset, e.g. ["city:fresno"]. */
+  keys: string[];
+  /** West, south, east, north. */
+  bbox: [number, number, number, number];
+}
+
 export interface PublishedScope {
   /** Path (relative to the data origin) of this window's tileset. */
   tiles: string;
+  /**
+   * Path of this window's area tileset: projects known only to a city, ZIP
+   * code or county, as county badges (z3–7), area badges (z8–10) and dots
+   * laid out around each area's anchor (z11+). Absent in older builds, whose
+   * main tileset still holds those projects.
+   */
+  areaTiles?: string;
   mapped: number;
   byStatus: Record<ProjectStatus, number>;
   /** By map mark: exact (solid), intersection (lighter center), approx (ring). */
@@ -355,6 +383,8 @@ export interface TilePointProperties {
   id: string;
   /** Title, truncated for hover. */
   t: string;
+  /** In the area tileset: the area a project is known only to ("Fresno"). */
+  an?: string;
   /** Status id. */
   s: ProjectStatus;
   /** Mark: 1 = exact, 2 = near a named location (cross streets, postmiles, crossings, places), 0 = approximate (see PRECISION_MARK). */
