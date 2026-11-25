@@ -22,6 +22,11 @@ export interface Basemap {
   label: string;
   /** Which status palette and point halo to use on top of this basemap. */
   mode: 'light' | 'dark';
+  /**
+   * Shown instead when this basemap's tile host is down (see basemapWatch.ts):
+   * the OpenFreeMap styles fall back to USGS, which is hosted separately.
+   */
+  fallback?: BasemapId;
   /** Swatch for the picker. */
   swatch: string;
   style: () => Promise<StyleSpecification | string>;
@@ -84,12 +89,40 @@ async function openFreeMap(name: string, recolor?: 'paper' | 'night'): Promise<S
 }
 
 export const BASEMAPS: readonly Basemap[] = [
-  { id: 'paper', label: 'Paper', mode: 'light', swatch: '#f4f2ee', style: () => openFreeMap('positron', 'paper') },
-  { id: 'night', label: 'Night', mode: 'dark', swatch: '#121212', style: () => openFreeMap('dark', 'night') },
-  { id: 'streets', label: 'Streets', mode: 'light', swatch: '#f2efe9', style: () => openFreeMap('liberty') },
+  {
+    id: 'paper',
+    label: 'Paper',
+    mode: 'light',
+    swatch: '#f4f2ee',
+    fallback: 'topo',
+    style: () => openFreeMap('positron', 'paper'),
+  },
+  {
+    id: 'night',
+    label: 'Night',
+    mode: 'dark',
+    swatch: '#121212',
+    fallback: 'imagery',
+    style: () => openFreeMap('dark', 'night'),
+  },
+  {
+    id: 'streets',
+    label: 'Streets',
+    mode: 'light',
+    swatch: '#f2efe9',
+    fallback: 'topo',
+    style: () => openFreeMap('liberty'),
+  },
   { id: 'topo', label: 'USGS Topo', mode: 'light', swatch: '#d9e4c8', style: usgs('USGSTopo', 16) },
   { id: 'imagery', label: 'Aerial', mode: 'dark', swatch: '#4a5a3c', style: usgs('USGSImageryOnly', 16) },
-  { id: 'hybrid', label: 'Aerial + labels', mode: 'dark', swatch: '#5d6b4c', style: imageryWithLabels },
+  {
+    id: 'hybrid',
+    label: 'Aerial + labels',
+    mode: 'dark',
+    swatch: '#5d6b4c',
+    fallback: 'imagery',
+    style: imageryWithLabels,
+  },
   { id: 'relief', label: 'Shaded relief', mode: 'light', swatch: '#cfcac0', style: usgs('USGSShadedReliefOnly', 13) },
 ];
 

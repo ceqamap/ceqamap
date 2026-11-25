@@ -191,6 +191,19 @@ export function App() {
     writeParam('b', id === 'paper' ? null : id, false);
   }, []);
 
+  // A basemap's tile host is down: show its fallback, but keep the visitor's
+  // choice in the link, so the next visit tries it again.
+  const basemapDown = useCallback((id: BasemapId) => {
+    const down = basemapById(id);
+    if (!down.fallback) return;
+    const fallback = basemapById(down.fallback);
+    setBasemapId((current) => (current === id ? fallback.id : current));
+    const notice = `The ${down.label} map isn’t loading right now, so you’re seeing ${fallback.label}.`;
+    setMapError(notice);
+    // The map works; the notice needn't stay.
+    window.setTimeout(() => setMapError((m) => (m === notice ? null : m)), 8000);
+  }, []);
+
   return (
     <div className={`app mode-${basemap.mode} ${selected ? 'drawer-open' : ''}`}>
       <MapView
@@ -204,6 +217,7 @@ export function App() {
         onHover={canHover ? setHover : () => {}}
         onSelect={select}
         onError={setMapError}
+        onBasemapDown={basemapDown}
       />
       <div className="frame" aria-hidden="true">
         <span className="tick tl" />
