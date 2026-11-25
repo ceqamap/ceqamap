@@ -177,7 +177,7 @@ function ProjectDetail({
 
       {p.location?.area ? (
         <p className="drawer-place">
-          Somewhere in {p.location.area.name}
+          {p.location.area.name}
           <span className="muted"> · {areaPhrase(p.location.area)}</span>
         </p>
       ) : (

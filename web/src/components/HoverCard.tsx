@@ -62,16 +62,12 @@ export function HoverCard({
         <p className="hover-meta">
           {formatNumber(info.count)} {info.count === 1 ? 'project' : 'projects'}, {what} listed only
         </p>
-        <p className="hover-meta">
-          {info.inReview > 0 ? (
-            <>
-              <span className="dot" style={{ background: STATUS_BY_ID.in_review[mode] }} aria-hidden="true" />
-              {formatNumber(info.inReview)} in public review now
-            </>
-          ) : (
-            'Click to see them'
-          )}
-        </p>
+        {info.inReview > 0 && (
+          <p className="hover-meta">
+            <span className="dot" style={{ background: STATUS_BY_ID.in_review[mode] }} aria-hidden="true" />
+            {formatNumber(info.inReview)} in public review now
+          </p>
+        )}
         {info.arrived > 0 && (
           <p className="hover-meta hover-new">
             <span className="new-ring" aria-hidden="true" />
@@ -96,7 +92,7 @@ export function HoverCard({
         />
         {status.label}
         {info.props.an
-          ? ` · somewhere in ${info.props.an}`
+          ? ` · ${info.props.an}`
           : info.props.x === 0
             ? ' · approximate location'
             : info.props.x === 2
