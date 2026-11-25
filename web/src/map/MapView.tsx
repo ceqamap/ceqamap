@@ -15,7 +15,8 @@ import {
   OUTLINE_SOURCE,
   showAreaOutline,
 } from './areaLayers.ts';
-import { type Basemap, GLYPHS } from './basemaps.ts';
+import { type Basemap, type BasemapId, GLYPHS } from './basemaps.ts';
+import { BasemapWatch, type MapErrorLike } from './basemapWatch.ts';
 import {
   applyStages,
   arrivalOpacity,
@@ -27,6 +28,9 @@ import {
   SOURCE_ID,
   SOURCE_LAYER,
 } from './layers.ts';
+
+/** Our own data sources: their errors are ours to report, not a basemap outage. */
+const DATA_SOURCES = [SOURCE_ID, AREA_SOURCE, OUTLINE_SOURCE];
 
 /** California, with room for the header and legend. */
 export const CALIFORNIA_BOUNDS: [[number, number], [number, number]] = [
@@ -85,6 +89,8 @@ export interface MapViewProps {
   onHover: (info: HoverInfo | null) => void;
   onSelect: (sch: string | null) => void;
   onError: (message: string) => void;
+  /** The basemap's tile host is down (see basemapWatch.ts); show its fallback. */
+  onBasemapDown: (id: BasemapId) => void;
 }
 
 export interface MapViewHandle {
@@ -128,6 +134,9 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
   const appliedTiles = useRef<string | null>(null);
   const appliedAreaTiles = useRef<string | null>(null);
   const appliedBoundaries = useRef<string | null>(null);
+  const basemapWatch = useRef(
+    new BasemapWatch(DATA_SOURCES, () => latest.current.onBasemapDown(latest.current.basemap.id)),
+  );
   // True between a style's 'style.load' and the next setStyle. We track this
   // ourselves: map.isStyleLoaded() is also false while basemap tiles are still
   // streaming in, which made us skip adding the project layers (2026-11-19).
@@ -164,8 +173,9 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       try {
         style = await latest.current.basemap.style();
       } catch (e) {
-        // Keep the data usable even if the basemap host is down.
-        latest.current.onError(String((e as Error).message));
+        // Keep the data usable even if the basemap host is down, and switch to the fallback if there is one.
+        if (latest.current.basemap.fallback) latest.current.onBasemapDown(latest.current.basemap.id);
+        else latest.current.onError(String((e as Error).message));
         style = BLANK_STYLE;
       }
       if (disposed || !container.current) return;
@@ -227,6 +237,8 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
         // Missing tiles at the edges are normal; only surface source failures.
         const source = (e as { sourceId?: string }).sourceId;
         if (source === SOURCE_ID || source === AREA_SOURCE) latest.current.onError('Some map data failed to load.');
+        // The basemap's own host failing: switch to its fallback.
+        if (latest.current.basemap.fallback) basemapWatch.current.report(e as MapErrorLike);
       });
 
       map.on('mousemove', (e) => {
@@ -361,9 +373,14 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       .then((style) => {
         if (cancelled) return;
         styleReady.current = false;
+        basemapWatch.current.reset();
         map.setStyle(style, { diff: false }); // style.load re-adds our layers
       })
-      .catch((e: Error) => latest.current.onError(e.message));
+      .catch((e: Error) => {
+        if (cancelled) return;
+        if (basemap.fallback) latest.current.onBasemapDown(basemap.id);
+        else latest.current.onError(e.message);
+      });
     return () => {
       cancelled = true;
     };
