@@ -94,13 +94,7 @@ export function areaLayers({ mode, stages, marks }: LayerTheme): LayerSpecificat
       type: 'circle',
       source: AREA_SOURCE,
       'source-layer': AREA_SOURCE_LAYER,
-      filter: on
-        ? ([
-            'all',
-            ['>', ['coalesce', ['get', 'n'], 0], 0],
-            ['any', dotFilter, badgeFilter],
-          ] as unknown as ExpressionSpecification)
-        : NONE,
+      filter: ['all', ['>', ['coalesce', ['get', 'n'], 0], 0], dotFilter] as unknown as ExpressionSpecification,
       paint: {
         'circle-radius': arrivalRadius(stages, 0.45, null, marks),
         'circle-color': 'rgba(0, 0, 0, 0)',
