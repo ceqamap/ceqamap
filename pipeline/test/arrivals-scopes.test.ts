@@ -125,6 +125,32 @@ describe('summarizeArrivals', () => {
     assert.equal(r.published?.items.find((i) => i.id === '2026110003')?.lon, null);
   });
 
+  it('puts projects taking comments first, soonest deadline first', () => {
+    const review = (sch: string, reviewEnd: string) => ({
+      ...project(sch, -120, 37),
+      status: 'in_review' as const,
+      reviewEnd,
+    });
+    const docs = ['2026110010', '2026110011', '2026110012', '2026110013'].map((sch) =>
+      doc({ key: sch, sch, type: 'NOP', received: '2026-11-19' }),
+    );
+    const r = summarizeArrivals(
+      { at: stored.at, docs: docs.map((d) => ({ key: d.key, sch: d.sch, type: d.type })) },
+      new Map(docs.map((d) => [d.sch, [d]])),
+      new Map([
+        ['2026110010', project('2026110010', -120, 37)],
+        ['2026110011', review('2026110011', '2026-12-20')],
+        ['2026110012', project('2026110012', -120, 37)],
+        ['2026110013', review('2026110013', '2026-12-05')],
+      ]),
+      now,
+    );
+    assert.deepEqual(
+      r.published?.items.map((i) => i.id),
+      ['2026110013', '2026110011', '2026110010', '2026110012'],
+    );
+  });
+
   it('stops pinging a stale batch', () => {
     const later = new Date(Date.parse(stored.at) + (ARRIVALS_MAX_AGE_DAYS + 1) * 86_400_000);
     const r = summarizeArrivals(stored, groups, projects, later);
