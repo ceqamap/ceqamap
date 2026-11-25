@@ -8,8 +8,8 @@ import { LAYER, SOURCE_ID } from './layers.ts';
  * Each zoom level has its own tiles: clusters regroup, badges move, and dots
  * come out of clusters. MapLibre swaps those in at once, which reads as a
  * jump. So as the map nears a level change, in either direction, the layers
- * that change fade out with the zoom; once the new tiles arrive they fade
- * back in, the counts a beat after their circles. Stopping short of the
+ * that change dim with the zoom; once the new tiles arrive they fade
+ * back up, the counts a beat after their circles. Stopping short of the
  * change fades them back without one.
  *
  * Only opacity: the radius is data-driven, and changing a data-driven value
@@ -51,8 +51,14 @@ const CLUSTER_MAXZOOM = 12;
 const BADGE_MAXZOOM = 10;
 
 /** How far before a level change (in zoom levels) the fade-out starts. */
-const LEAD = 0.3;
-const FADE_IN_MS = 600;
+const LEAD = 0.4;
+/**
+ * The faintest they get. Fading all the way out blanked the map at every
+ * level, which read as a flicker on a long zoom (2026-11-25); dimmed, the swap
+ * is soft and there is always something on screen.
+ */
+const FLOOR = 0.35;
+const FADE_IN_MS = 450;
 const MAX_WAIT_MS = 260; // from the level change: fade in even if the new tiles are slow
 
 /** Ease-in-out: no sudden start, a soft landing. */
@@ -70,7 +76,13 @@ function partsBetween(a: number, b: number): Part[] | null {
   return parts;
 }
 
-export function watchZoomFades(map: MapLibreMap): () => void {
+export interface ZoomFades {
+  /** How visible the clusters and badges are now, 0..1, for rings drawn around them. */
+  shown(): number;
+  stop(): void;
+}
+
+export function watchZoomFades(map: MapLibreMap): ZoomFades {
   let zoom = map.getZoom();
   let level = Math.floor(zoom);
   /** Each eased property's resting value, so we land exactly on what was there. */
@@ -151,7 +163,7 @@ export function watchZoomFades(map: MapLibreMap): () => void {
       if (!parts) return;
       cancelAnimationFrame(raf);
       join(parts);
-      show(0);
+      show(Math.min(shown, FLOOR));
       waiting = true;
       window.clearTimeout(timer);
       timer = window.setTimeout(fadeIn, MAX_WAIT_MS);
@@ -167,7 +179,7 @@ export function watchZoomFades(map: MapLibreMap): () => void {
     if (!parts) return;
     const left = dir > 0 ? level + 1 - z : z - level; // zoom levels to go
     if (left >= LEAD) return;
-    const k = left / LEAD;
+    const k = FLOOR + ((1 - FLOOR) * left) / LEAD;
     if (k >= shown) return; // already fainter (a fade-in caught up with us)
     cancelAnimationFrame(raf);
     join(parts);
@@ -192,13 +204,16 @@ export function watchZoomFades(map: MapLibreMap): () => void {
   map.on('zoom', onZoom);
   map.on('zoomend', onZoomEnd);
   map.on('style.load', onStyle);
-  return () => {
-    map.off('zoom', onZoom);
-    map.off('zoomend', onZoomEnd);
-    map.off('style.load', onStyle);
-    map.off('sourcedata', onData);
-    cancelAnimationFrame(raf);
-    window.clearTimeout(timer);
-    finish();
+  return {
+    shown: () => shown,
+    stop: () => {
+      map.off('zoom', onZoom);
+      map.off('zoomend', onZoomEnd);
+      map.off('style.load', onStyle);
+      map.off('sourcedata', onData);
+      cancelAnimationFrame(raf);
+      window.clearTimeout(timer);
+      finish();
+    },
   };
 }

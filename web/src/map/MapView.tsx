@@ -28,7 +28,7 @@ import {
   SOURCE_ID,
   SOURCE_LAYER,
 } from './layers.ts';
-import { watchZoomFades } from './zoomFade.ts';
+import { watchZoomFades, type ZoomFades } from './zoomFade.ts';
 
 /** Our own data sources: their errors are ours to report, not a basemap outage. */
 const DATA_SOURCES = [SOURCE_ID, AREA_SOURCE, OUTLINE_SOURCE];
@@ -174,7 +174,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     let map: MapLibreMap | null = null;
     let raf = 0;
     let unplaceCredits = () => {};
-    let unwatchFades = () => {};
+    let fades: ZoomFades | null = null;
 
     (async () => {
       let style: StyleSpecification | string;
@@ -238,7 +238,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       mapRef.current = map;
       setMapReady(true);
 
-      if (!prefersReducedMotion()) unwatchFades = watchZoomFades(map);
+      if (!prefersReducedMotion()) fades = watchZoomFades(map);
 
       map.on('style.load', () => {
         styleReady.current = true;
@@ -321,7 +321,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
           last = t;
           const phase = (t % 2400) / 2400;
           map!.setPaintProperty(LAYER.pulse, 'circle-radius', 6 + phase * 14);
-          map!.setPaintProperty(LAYER.pulse, 'circle-opacity', 0.35 * (1 - phase));
+          map!.setPaintProperty(LAYER.pulse, 'circle-opacity', 0.35 * (1 - phase) * (fades?.shown() ?? 1));
           if (map!.getLayer(LAYER.arrivals)) {
             const ping = pingProgress(t);
             map!.setPaintProperty(
@@ -329,14 +329,22 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
               'circle-radius',
               arrivalRadius(latest.current.stages, ping, latest.current.selected, latest.current.marks),
             );
-            map!.setPaintProperty(LAYER.arrivals, 'circle-stroke-opacity', arrivalOpacity(ping));
+            map!.setPaintProperty(
+              LAYER.arrivals,
+              'circle-stroke-opacity',
+              arrivalOpacity(ping) * (fades?.shown() ?? 1),
+            );
             if (map!.getLayer(AREA_LAYER.arrivals)) {
               map!.setPaintProperty(
                 AREA_LAYER.arrivals,
                 'circle-radius',
                 arrivalRadius(latest.current.stages, ping, latest.current.selected, latest.current.marks),
               );
-              map!.setPaintProperty(AREA_LAYER.arrivals, 'circle-stroke-opacity', arrivalOpacity(ping));
+              map!.setPaintProperty(
+                AREA_LAYER.arrivals,
+                'circle-stroke-opacity',
+                arrivalOpacity(ping) * (fades?.shown() ?? 1),
+              );
             }
           }
         };
@@ -366,7 +374,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       disposed = true;
       cancelAnimationFrame(raf);
       unplaceCredits();
-      unwatchFades();
+      fades?.stop();
       map?.remove();
       mapRef.current = null;
     };
