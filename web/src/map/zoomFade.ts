@@ -7,8 +7,10 @@ import { LAYER, SOURCE_ID } from './layers.ts';
  *
  * Each zoom level has its own tiles: clusters regroup, badges move, and dots
  * come out of clusters. MapLibre swaps those in at once, which reads as a
- * jump. When the level changes we hide the layers that change, then fade
- * them back in once the new tiles arrive, the counts a beat after their circles.
+ * jump. So as the map nears a level change, in either direction, the layers
+ * that change fade out with the zoom; once the new tiles arrive they fade
+ * back in, the counts a beat after their circles. Stopping short of the
+ * change fades them back without one.
  *
  * Only opacity: the radius is data-driven, and changing a data-driven value
  * makes MapLibre lay the tiles out again, too slow to do every frame.
@@ -48,95 +50,151 @@ const AREA_DOTS: Part[] = [
 const CLUSTER_MAXZOOM = 12;
 const BADGE_MAXZOOM = 10;
 
-const EASE_MS = 600;
-const MAX_WAIT_MS = 180; // ease in even if the new tiles are slow
+/** How far before a level change (in zoom levels) the fade-out starts. */
+const LEAD = 0.3;
+const FADE_IN_MS = 600;
+const MAX_WAIT_MS = 260; // from the level change: fade in even if the new tiles are slow
 
 /** Ease-in-out: no sudden start, a soft landing. */
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
+/** What changes between two neighboring levels, or null if nothing does. */
+function partsBetween(a: number, b: number): Part[] | null {
+  const lo = Math.min(a, b);
+  const hi = Math.max(a, b);
+  if (lo > CLUSTER_MAXZOOM) return null; // above the clusters nothing regroups
+  const parts = [...REGROUPING];
+  // Where clusters or badges hand over to dots, the dots go and come too.
+  if (lo <= CLUSTER_MAXZOOM && hi > CLUSTER_MAXZOOM) parts.push(...PROJECT_DOTS);
+  if (lo <= BADGE_MAXZOOM && hi > BADGE_MAXZOOM) parts.push(...AREA_DOTS);
+  return parts;
+}
+
 export function watchZoomFades(map: MapLibreMap): () => void {
-  let level = Math.floor(map.getZoom());
+  let zoom = map.getZoom();
+  let level = Math.floor(zoom);
   /** Each eased property's resting value, so we land exactly on what was there. */
   const active = new Map<string, { part: Part; base: number }>();
-  let timer = 0;
+  /** How visible the eased layers are now, 0..1. */
+  let shown = 1;
   let raf = 0;
+  let timer = 0;
+  /** Waiting for the new level's tiles before fading in. */
+  let waiting = false;
 
   const set = (layer: string, prop: string, value: number) => {
     if (map.getLayer(layer)) map.setPaintProperty(layer, prop, value);
   };
 
+  /** Start easing these, at the current visibility so nothing jumps. */
+  const join = (parts: Part[]) => {
+    for (const part of parts) {
+      const [layer, prop] = part;
+      const key = `${layer}|${prop}`;
+      if (active.has(key) || !map.getLayer(layer)) continue;
+      const now: unknown = map.getPaintProperty(layer, prop);
+      if (now !== undefined && typeof now !== 'number') continue; // an expression: leave it alone
+      active.set(key, { part, base: now ?? 1 });
+      map.setPaintProperty(layer, `${prop}-transition`, { duration: 0, delay: 0 });
+      set(layer, prop, (now ?? 1) * shown);
+    }
+  };
+
+  const show = (k: number) => {
+    shown = k;
+    for (const { part, base } of active.values()) set(part[0], part[1], base * k);
+  };
+
   const finish = () => {
     for (const { part, base } of active.values()) set(part[0], part[1], base);
     active.clear();
+    shown = 1;
   };
 
-  const easeIn = () => {
+  const fadeIn = () => {
+    waiting = false;
     window.clearTimeout(timer);
     map.off('sourcedata', onData);
     cancelAnimationFrame(raf);
+    if (active.size === 0) return;
+    const from = shown;
     const start = performance.now();
     const frame = (now: number) => {
-      const t = Math.min(1, (now - start) / EASE_MS);
-      if (t >= 1) return finish();
+      const t = Math.min(1, (now - start) / FADE_IN_MS);
+      // Counts trail their circles: each part runs on its own lagged clock.
       for (const { part, base } of active.values()) {
         const lag = part[2] ?? 0;
-        set(part[0], part[1], base * ease(Math.max(0, (t - lag) / (1 - lag))));
+        set(part[0], part[1], base * (from + (1 - from) * ease(Math.max(0, (t - lag) / (1 - lag)))));
       }
-      raf = requestAnimationFrame(frame);
+      shown = from + (1 - from) * ease(t);
+      if (t < 1) raf = requestAnimationFrame(frame);
+      else finish();
     };
     raf = requestAnimationFrame(frame);
   };
 
   const onData = (e: { sourceId?: string }) => {
     if (e.sourceId !== SOURCE_ID && e.sourceId !== AREA_SOURCE) return;
-    if ([SOURCE_ID, AREA_SOURCE].every((id) => !map.getSource(id) || map.isSourceLoaded(id))) easeIn();
-  };
-
-  const tuck = (parts: Part[]) => {
-    cancelAnimationFrame(raf);
-    for (const part of parts) {
-      const [layer, prop] = part;
-      if (!map.getLayer(layer)) continue;
-      const key = `${layer}|${prop}`;
-      if (!active.has(key)) {
-        const now: unknown = map.getPaintProperty(layer, prop);
-        if (now !== undefined && typeof now !== 'number') continue; // an expression: leave it alone
-        active.set(key, { part, base: now ?? 1 });
-        map.setPaintProperty(layer, `${prop}-transition`, { duration: 0, delay: 0 });
-      }
-      set(layer, prop, 0);
-    }
-    window.clearTimeout(timer);
-    timer = window.setTimeout(easeIn, MAX_WAIT_MS);
-    map.off('sourcedata', onData);
-    map.on('sourcedata', onData);
+    if ([SOURCE_ID, AREA_SOURCE].every((id) => !map.getSource(id) || map.isSourceLoaded(id))) fadeIn();
   };
 
   const onZoom = () => {
-    const next = Math.floor(map.getZoom());
-    if (next === level) return;
-    const lo = Math.min(level, next);
-    const hi = Math.max(level, next);
-    level = next;
-    if (lo > CLUSTER_MAXZOOM) return; // above the clusters nothing regroups
-    const parts = [...REGROUPING];
-    // Where clusters or badges hand over to dots, the dots arrive too.
-    if (lo <= CLUSTER_MAXZOOM && hi > CLUSTER_MAXZOOM) parts.push(...PROJECT_DOTS);
-    if (lo <= BADGE_MAXZOOM && hi > BADGE_MAXZOOM) parts.push(...AREA_DOTS);
-    tuck(parts);
+    const z = map.getZoom();
+    const dir = Math.sign(z - zoom);
+    zoom = z;
+    const next = Math.floor(z);
+
+    if (next !== level) {
+      // Crossed: whatever was still showing goes now, and the new tiles fade in when they land.
+      const parts = partsBetween(level, next);
+      level = next;
+      if (!parts) return;
+      cancelAnimationFrame(raf);
+      join(parts);
+      show(0);
+      waiting = true;
+      window.clearTimeout(timer);
+      timer = window.setTimeout(fadeIn, MAX_WAIT_MS);
+      map.off('sourcedata', onData);
+      map.on('sourcedata', onData);
+      return;
+    }
+    if (waiting || dir === 0) return;
+
+    // Approaching the next level in the direction of travel: fade out with the zoom.
+    const ahead = dir > 0 ? level + 1 : level - 1;
+    const parts = partsBetween(level, ahead);
+    if (!parts) return;
+    const left = dir > 0 ? level + 1 - z : z - level; // zoom levels to go
+    if (left >= LEAD) return;
+    const k = left / LEAD;
+    if (k >= shown) return; // already fainter (a fade-in caught up with us)
+    cancelAnimationFrame(raf);
+    join(parts);
+    show(k);
+  };
+
+  // Stopped short of a level change: bring back what we faded.
+  const onZoomEnd = () => {
+    if (!waiting && active.size > 0) fadeIn();
   };
 
   // Restyling (a new basemap) replaces these values; drop ours rather than land on stale ones.
   const onStyle = () => {
     cancelAnimationFrame(raf);
     window.clearTimeout(timer);
+    map.off('sourcedata', onData);
     active.clear();
+    shown = 1;
+    waiting = false;
   };
 
   map.on('zoom', onZoom);
+  map.on('zoomend', onZoomEnd);
   map.on('style.load', onStyle);
   return () => {
     map.off('zoom', onZoom);
+    map.off('zoomend', onZoomEnd);
     map.off('style.load', onStyle);
     map.off('sourcedata', onData);
     cancelAnimationFrame(raf);
