@@ -21,8 +21,9 @@ the filing timeline), and the green "live" pulse.
 | Solid dot      | Location from the agency's coordinates                               |
 | Hollow ring    | Approximate location (along a named street, in a community)          |
 | Cluster ring   | Hairline circle with count; **green ring** = contains an open review |
-| Area spiral    | Known only to a city/ZIP/county: z11+ hollow rings in a sunflower    |
-|                | around downtown (in the ordinary clusters below z11)                 |
+| Area badge     | z8–10: double hairline ring with count and name, one per city, ZIP   |
+|                | or county, for projects known only to it (in clusters up to z7)      |
+| Area spiral    | z11+: those projects as hollow rings in a sunflower around downtown  |
 | Area outline   | A selected area-only project's city, ZIP or county, in stage color   |
 | Breathing halo | Project in public review right now (off with reduced motion)         |
 | Ping ring      | Arrived in the latest batch; same ring as the header's live dot      |

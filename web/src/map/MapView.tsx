@@ -10,6 +10,7 @@ import {
   AREA_SOURCE,
   AREA_SOURCE_LAYER,
   applyAreaStages,
+  badgeInfo,
   ensureAreaLayers,
   OUTLINE_SOURCE,
   showAreaOutline,
@@ -42,6 +43,19 @@ export type HoverInfo =
       count: number;
       inReview: number;
       arrived: number;
+    }
+  | {
+      /** A city, ZIP code or county badge: projects known only to that area. */
+      kind: 'area';
+      x: number;
+      y: number;
+      name: string;
+      count: number;
+      inReview: number;
+      arrived: number;
+      /** What the records list: a city, a ZIP code, a county; `several` for "cities", "counties". */
+      listed: 'city' | 'zip' | 'county';
+      several: boolean;
     };
 
 /** A selected project known only to an area: outline these, in this color. */
@@ -221,7 +235,14 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
         setHovered(map!, f && !f.properties.point_count ? f : null);
         map!.getCanvas().style.cursor = f ? 'pointer' : '';
         if (!f) return latest.current.onHover(null);
-        if (f.properties.point_count) {
+        if (f.properties.f === 'b') {
+          latest.current.onHover({
+            kind: 'area',
+            x: e.point.x,
+            y: e.point.y,
+            ...badgeInfo(f.properties, latest.current.stages),
+          });
+        } else if (f.properties.point_count) {
           latest.current.onHover({
             kind: 'cluster',
             x: e.point.x,
@@ -246,7 +267,15 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
         const f = map!.queryRenderedFeatures(e.point, { layers: interactiveLayers(map!) })[0] as
           MapGeoJSONFeature | undefined;
         if (!f) return latest.current.onSelect(null);
-        if (f.properties.point_count) {
+        if (f.properties.f === 'b') {
+          // An area badge: zoom in on its downtown, where its projects spread out.
+          const [lon, lat] = (f.geometry as { coordinates: [number, number] }).coordinates;
+          map!.easeTo({
+            center: [lon, lat],
+            zoom: Math.max(map!.getZoom() + 1, 12),
+            duration: prefersReducedMotion() ? 0 : 700,
+          });
+        } else if (f.properties.point_count) {
           const [lon, lat] = (f.geometry as { coordinates: [number, number] }).coordinates;
           map!.easeTo({
             center: [lon, lat],

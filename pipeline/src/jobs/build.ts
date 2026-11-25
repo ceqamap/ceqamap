@@ -192,12 +192,15 @@ for (const scope of TIME_SCOPES) {
     if (area) members.push({ point: f, area, latest: latestFiling.get(f.properties.id) ?? '' });
     else own.push(JSON.stringify(f));
   }
-  // Area projects: in the clusters up to z10 (so the zoomed-out map looks as
-  // before), then as an unclustered sunflower (see areas.ts).
-  const { dots, clustered } = areaTileFeatures(members, boundaries, anchors);
+  // Area projects: in the clusters up to z7 (so the statewide map looks as
+  // before), then a badge per area, then an unclustered sunflower (see areas.ts).
+  const { dots, badges, clustered } = areaTileFeatures(members, boundaries, anchors);
   for (const f of clustered) own.push(JSON.stringify(f));
   await writeFile(join(OUT, `points-${scope.id}.ndjson`), own.join('\n') + '\n');
-  await writeFile(join(OUT, `areas-${scope.id}.ndjson`), dots.map((f) => JSON.stringify(f)).join('\n') + '\n');
+  await writeFile(
+    join(OUT, `areas-${scope.id}.ndjson`),
+    [...badges, ...dots].map((f) => JSON.stringify(f)).join('\n') + '\n',
+  );
   areaStats[scope.id] = members.length;
 }
 {
@@ -286,7 +289,7 @@ for (const scope of TIME_SCOPES) {
   if (tippecanoe.error) throw new Error(`tippecanoe could not start: ${tippecanoe.error.message}`);
   if (tippecanoe.status !== 0) throw new Error(`tippecanoe exited with ${tippecanoe.status} (${scope.id})`);
 
-  // The area sunflowers from z11: no clustering (see areas.ts).
+  // Area badges (z8–10) and sunflowers (z11+): no clustering (see areas.ts).
   runTippecanoe(`areas ${scope.id}`, [
     '--output',
     join(OUT, `areas-${scope.id}.pmtiles`),
@@ -296,7 +299,7 @@ for (const scope of TIME_SCOPES) {
     '--name',
     `CEQA projects by area (${scope.label})`,
     '--minimum-zoom',
-    '11',
+    '8',
     '--maximum-zoom',
     '14',
     '--drop-rate',

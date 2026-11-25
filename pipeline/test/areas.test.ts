@@ -124,8 +124,8 @@ describe('area tiles', () => {
     latest,
   });
 
-  it('puts each project in the clusters up to z10 and in the sunflower from z11, newest in the middle', () => {
-    const { dots, clustered } = areaTileFeatures(
+  it('puts each project in the clusters up to z7, a badge per area at z8–10, and the sunflower from z11', () => {
+    const { dots, badges, clustered } = areaTileFeatures(
       [
         member('a', 'exempt', '2026-01-01'),
         member('b', 'in_review', '2026-03-01'),
@@ -143,8 +143,16 @@ describe('area tiles', () => {
     assert.equal(dots[0].properties.c_in_review, 1);
     assert.deepEqual(
       clustered.map((d) => d.tippecanoe),
-      [{ maxzoom: 10 }, { maxzoom: 10 }, { maxzoom: 10 }],
+      [{ maxzoom: 7 }, { maxzoom: 7 }, { maxzoom: 7 }],
     );
+    assert.equal(badges.length, 1);
+    assert.deepEqual(badges[0].tippecanoe, { minzoom: 8, maxzoom: 10 });
+    assert.deepEqual(badges[0].geometry.coordinates, [-119.7871, 36.7378]);
+    assert.equal(badges[0].properties.an, 'Fresno');
+    assert.equal(badges[0].properties.ak, 'city');
+    assert.equal(badges[0].properties.total, 3);
+    assert.equal(badges[0].properties.c_exempt, 2);
+    assert.equal(badges[0].properties.c_in_review, 1);
     // Same spot in both, so clusters split apart into the sunflower.
     assert.deepEqual(
       clustered.map((d) => d.geometry.coordinates),

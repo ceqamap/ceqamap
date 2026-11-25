@@ -7,9 +7,12 @@
  * around it (newest filing in the middle), so every project is visible and
  * clickable but plainly arranged, not located:
  *
- *   up to z10  in the ordinary clusters (the main tileset), at their spiral
- *              positions, so the zoomed-out map looks as before
- *   z11+       as unclustered dots in the area tileset (areas-<scope>.pmtiles)
+ *   up to z7   in the ordinary clusters (the main tileset), at their spiral
+ *              positions, so the statewide map looks as before
+ *   z8–10      one badge per city, ZIP code or county area, at its anchor
+ *   z11+       as unclustered dots
+ *
+ * Badges and dots are in the area tileset (areas-<scope>.pmtiles).
  *
  * Selecting a project highlights its area's outline from the boundaries tileset.
  *
@@ -18,13 +21,15 @@
  * point deepest inside its outline; a ZIP code's or county's deepest point.
  */
 import type { PublishedArea, TilePointProperties } from '../../../packages/shared/src/index.ts';
+import { STATUSES, stageCountKey } from '../../../packages/shared/src/index.ts';
 import type { PointFeature } from './aggregate.ts';
 import type { Area, Boundaries } from './boundaries.ts';
 import { type BBox, inBBox, pointInShape, type Shape } from './geometry.ts';
 import type { Gazetteer } from './landmarks.ts';
 import type { PlacementArea } from './location.ts';
 
-/** From this zoom, area projects leave the clusters for the unclustered sunflower (see the file comment). */
+/** Zoom ranges (see the file comment): clusters up to z7, badges z8–10, dots from z11. */
+export const AREA_BADGE_MINZOOM = 8;
 export const AREA_DOT_MINZOOM = 11;
 
 /**
@@ -199,16 +204,16 @@ export interface AreaTileFeature {
 }
 
 /**
- * Tile features for one time window, per project: a dot in the area tileset
- * (z11+, unclustered, so the sunflower reads plainly), and a copy for the
- * clustered tileset up to z10, at the same spiral position, so zoomed out these
- * projects join the ordinary clusters exactly as before.
+ * Tile features for one time window: per project a dot (z11+, unclustered, so
+ * the sunflower reads plainly) and a copy for the clustered tileset up to z7 at
+ * the same spiral position; per area a badge (z8–10) counting its projects by
+ * stage, so the stage filter can recount it.
  */
 export function areaTileFeatures(
   members: AreaMember[],
   b: Boundaries,
   anchors: Anchors,
-): { dots: AreaTileFeature[]; clustered: AreaTileFeature[] } {
+): { dots: AreaTileFeature[]; badges: AreaTileFeature[]; clustered: AreaTileFeature[] } {
   const groups = new Map<string, AreaMember[]>();
   for (const m of members) {
     const k = groupKey(m.area);
@@ -217,11 +222,13 @@ export function areaTileFeatures(
     else groups.set(k, [m]);
   }
   const dots: AreaTileFeature[] = [];
+  const badges: AreaTileFeature[] = [];
   const clustered: AreaTileFeature[] = [];
-  for (const list of groups.values()) {
+  for (const [key, list] of groups) {
     const area = list[0].area;
     const anchor = anchors.of(area);
-    if (!anchor || !areaBBox(area, b)) continue;
+    const bbox = areaBBox(area, b);
+    if (!anchor || !bbox) continue;
     // Newest filing in the middle; SCH number breaks ties so layouts are stable.
     list.sort((x, y) =>
       x.latest < y.latest ? 1 : x.latest > y.latest ? -1 : x.point.properties.id < y.point.properties.id ? -1 : 1,
@@ -239,13 +246,32 @@ export function areaTileFeatures(
       });
       clustered.push({
         type: 'Feature',
-        tippecanoe: { maxzoom: AREA_DOT_MINZOOM - 1 },
+        tippecanoe: { maxzoom: AREA_BADGE_MINZOOM - 1 },
         geometry,
         properties: { ...props, an: area.name },
       });
     });
+    const counts: Record<string, number> = {};
+    for (const st of STATUSES) counts[stageCountKey(st.id)] = 0;
+    for (const m of list) counts[stageCountKey(m.point.properties.s)]++;
+    badges.push({
+      type: 'Feature',
+      tippecanoe: { minzoom: AREA_BADGE_MINZOOM, maxzoom: AREA_DOT_MINZOOM - 1 },
+      geometry: { type: 'Point', coordinates: [anchor.lon, anchor.lat] },
+      properties: {
+        f: 'b',
+        id: key,
+        an: area.name,
+        // What the record lists: "city", "zip", "county"; `am` when several ("cities", "counties").
+        ak: area.kind,
+        am: area.keys.length > 1 ? 1 : 0,
+        ...counts,
+        n: list.filter((m) => m.point.properties.n).length,
+        total: list.length,
+      },
+    });
   }
-  return { dots, clustered };
+  return { dots, badges, clustered };
 }
 
 /** City, ZIP code and county outlines as GeoJSON lines for tippecanoe (layer `areas`, property `k`). */

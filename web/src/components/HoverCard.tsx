@@ -45,6 +45,43 @@ export function HoverCard({
     );
   }
 
+  if (info.kind === 'area') {
+    const what =
+      info.listed === 'zip'
+        ? 'ZIP code'
+        : info.listed === 'city'
+          ? info.several
+            ? 'cities'
+            : 'city'
+          : info.several
+            ? 'counties'
+            : 'county';
+    return (
+      <div className="hover-card card" style={style} role="tooltip">
+        <p className="hover-title">{info.name}</p>
+        <p className="hover-meta">
+          {formatNumber(info.count)} {info.count === 1 ? 'project' : 'projects'}, {what} listed only
+        </p>
+        <p className="hover-meta">
+          {info.inReview > 0 ? (
+            <>
+              <span className="dot" style={{ background: STATUS_BY_ID.in_review[mode] }} aria-hidden="true" />
+              {formatNumber(info.inReview)} in public review now
+            </>
+          ) : (
+            'Click to see them'
+          )}
+        </p>
+        {info.arrived > 0 && (
+          <p className="hover-meta hover-new">
+            <span className="new-ring" aria-hidden="true" />
+            {formatNumber(info.arrived)} just arrived
+          </p>
+        )}
+      </div>
+    );
+  }
+
   const arrival = info.props.n ? arrivals?.items.find((i) => i.id === info.props.id) : undefined;
 
   const status = STATUS_BY_ID[info.props.s] ?? STATUS_BY_ID.other;
