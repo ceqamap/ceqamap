@@ -1,7 +1,7 @@
 import maplibregl, { type MapGeoJSONFeature, type Map as MapLibreMap, type StyleSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Protocol } from 'pmtiles';
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { MapMark, ProjectStatus, TilePointProperties } from '../../../packages/shared/src/index.ts';
 import { pingProgress } from '../lib/motion.ts';
 import {
@@ -144,6 +144,9 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
   // ourselves: map.isStyleLoaded() is also false while basemap tiles are still
   // streaming in, which made us skip adding the project layers (2026-11-19).
   const styleReady = useRef(false);
+  // Set once the map exists. The style is fetched first, so a project opened
+  // from a link can arrive before there is a map to move.
+  const [mapReady, setMapReady] = useState(false);
 
   useImperativeHandle(ref, () => ({
     zoomIn: () => mapRef.current?.zoomIn(),
@@ -231,6 +234,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       phone.addEventListener('change', placeCredits);
       unplaceCredits = () => phone.removeEventListener('change', placeCredits);
       mapRef.current = map;
+      setMapReady(true);
 
       map.on('style.load', () => {
         styleReady.current = true;
@@ -489,7 +493,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     }
     // Street level, past the cluster zoom, so the selected dot itself shows.
     map.flyTo({ center: [lon, lat], zoom: Math.max(map.getZoom(), LINK_ZOOM), duration });
-  }, [props.focus]);
+  }, [props.focus, mapReady]);
 
   function setHovered(map: MapLibreMap, f: MapGeoJSONFeature | null) {
     const id = f ? String(f.properties.id) : null;
