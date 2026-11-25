@@ -396,12 +396,15 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     if (!map || !props.tilesUrl || appliedTiles.current === props.tilesUrl || !styleReady.current) return;
     const source = map.getSource(SOURCE_ID) as maplibregl.VectorTileSource | undefined;
     if (source) source.setUrl(`pmtiles://${props.tilesUrl}`);
-    else
+    else {
       ensureProjectLayers(map, props.tilesUrl, {
         mode: props.basemap.mode,
         stages: latest.current.stages,
         marks: latest.current.marks,
       });
+      // The style loaded before the data did, so the selection had no source to mark yet.
+      if (appliedSelected.current) setFeature(map, appliedSelected.current, { selected: true });
+    }
     appliedTiles.current = props.tilesUrl;
   }, [props.tilesUrl, props.basemap.mode]);
 
@@ -425,6 +428,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
         LAYER.pulse,
       );
       showAreaOutline(map, latest.current.selectedArea);
+      if (appliedSelected.current) setFeature(map, appliedSelected.current, { selected: true });
     }
     appliedAreaTiles.current = areaTilesUrl;
     appliedBoundaries.current = boundariesUrl;
