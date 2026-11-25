@@ -100,5 +100,6 @@ describe('zipAfter', () => {
     assert.equal(zipAfter('The project is located at 3325 Myrtle Avenue, North Highlands, CA 95660', 3325), '95660');
     assert.equal(zipAfter('17802 Del Puerto Canyon Road, Patterson, CA 95363', 17802), '95363');
     assert.equal(zipAfter('3325 Myrtle Avenue near the 95660 sign', 3325), null);
+    assert.equal(zipAfter('program_5050 W. Pico Blvd., Los Angeles, CA 90019', 5050), '90019');
   });
 });

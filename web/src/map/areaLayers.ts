@@ -46,6 +46,7 @@ function badgeCount(stages: readonly ProjectStatus[]): ExpressionSpecification {
 }
 
 function badgeRadius(stages: readonly ProjectStatus[]): ExpressionSpecification {
+  // Keep in step with badgeRadiusPx in pipeline/src/lib/areas.ts, which nudges badges apart at these sizes.
   return ['step', badgeCount(stages), 12, 10, 14, 50, 17, 250, 21, 1000, 25] as unknown as ExpressionSpecification;
 }
 
@@ -57,7 +58,7 @@ export function badgeInfo(props: Record<string, unknown>, stages: readonly Proje
     count: stages.reduce((n, s) => n + num(props[stageCountKey(s)]), 0),
     inReview: stages.includes('in_review') ? num(props[stageCountKey('in_review')]) : 0,
     arrived: num(props.n),
-    listed: String(props.ak ?? 'city') as 'city' | 'zip' | 'county',
+    listed: String(props.ak ?? 'city') as 'city' | 'zip' | 'county' | 'mixed',
     several: num(props.am) > 0,
   };
 }

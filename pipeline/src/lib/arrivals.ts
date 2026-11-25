@@ -109,6 +109,8 @@ export function summarizeArrivals(
 
   const arrivedKeys = new Set(stored.docs.map((d) => d.key));
   const items: PublishedArrival[] = [];
+  /** When comments close, for arrivals still taking comments. */
+  const commentsDue = new Map<string, string>();
   for (const sch of new Set(stored.docs.map((d) => d.sch))) {
     const docs = groups.get(sch);
     const project = projects.get(sch);
@@ -118,6 +120,7 @@ export function summarizeArrivals(
     const kind = arrived.length === docs.length ? 'project' : 'filing';
     const newest = arrived.reduce((a, b) => (b.received > a.received ? b : a));
     flags.set(sch, kind === 'project' ? 2 : 1);
+    if (project.status === 'in_review' && project.reviewEnd) commentsDue.set(sch, project.reviewEnd);
     items.push({
       id: sch,
       kind,
@@ -128,7 +131,19 @@ export function summarizeArrivals(
     });
   }
   if (items.length === 0) return { flags, published: null };
-  items.sort((a, b) => (a.id < b.id ? -1 : 1));
+  // The header's "N new" steps through these in order. Projects taking
+  // comments come first, soonest deadline first: they are the ones a reader
+  // can still act on. The rest follow by SCH number.
+  items.sort((a, b) => {
+    const da = commentsDue.get(a.id);
+    const db = commentsDue.get(b.id);
+    if (da !== db) {
+      if (da === undefined) return 1;
+      if (db === undefined) return -1;
+      return da < db ? -1 : 1;
+    }
+    return a.id < b.id ? -1 : 1;
+  });
   return {
     flags,
     published: {

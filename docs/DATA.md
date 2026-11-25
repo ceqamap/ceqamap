@@ -61,7 +61,7 @@ Only about 11% of projects (38,000 of 335,000) have agency coordinates; nothing 
 each area has an anchor (a city's GNIS populated-place point, i.e. its downtown, else the point deepest inside the
 outline) and its projects are laid out in a sunflower spiral around it, newest filing in the middle (210 m step, ~12 px
 apart at z11). Up to z7 they sit in the ordinary clusters at those positions, so the statewide map looks as before;
-at z8–10 one badge per city, ZIP code or county counts them (hover: "Coalinga", "6 projects, city listed only"); from
+at z8–10 one badge per city (ZIP codes inside it and records listing several cities join it), or ZIP code or county outside any city, counts them, nudged per zoom so badges don't overlap (hover: "Coalinga", "6 projects, city listed only"); from
 z11 the area tileset shows them unclustered. (Badges per county at statewide zoom, drawn over the clusters, were tried
 on the preview and dropped as clutter.) Selecting one shows the area's outline (boundaries
 tileset, property `k` = "city:fresno", "zip:95660", "county:inyo") and the drawer says "Fresno · Only the city is

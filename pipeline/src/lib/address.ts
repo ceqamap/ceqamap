@@ -39,6 +39,15 @@ const NOT_A_HOUSE_NUMBER =
 const NOT_A_STREET =
   /^(?:(?:n|s|e|w|north|south|east|west)\.?\s+)?(?:state\s+|us\s+|u\.s\.\s+|interstate\s+|i\s+|ca\s+|sr\s+|route\s+|rte\s+)|\b(?:acres?|ac|lots?|units?|homes|dwelling|parcels?|sq|square\s+feet|feet|ft|miles?|mi|percent|year|years|stories|story|spaces|beds?|rooms?|apn|of|and|on|at|to|the|from|between|near|for|in|by|along|under|over|per|foot|wide|maximum|pounds|linear|lf|inch|inches|gallons?|tons?|cubic|yards?|new|off|existing|proposed)\b/i;
 
+/**
+ * Text as the address patterns expect it: underscores are separators, not
+ * part of a word ("…program_5050 W. Pico Blvd." from file-name-style titles),
+ * and runs of whitespace are one space.
+ */
+export function forAddresses(text: string): string {
+  return text.replace(/_+/g, ' ').replace(/\s+/g, ' ');
+}
+
 export interface ExtractedAddress {
   /** "1234 Main St", ready for a geocoder. */
   street: string;
@@ -47,7 +56,7 @@ export interface ExtractedAddress {
 
 export function extractAddress(text: string): ExtractedAddress | null {
   if (!text) return null;
-  const clean = text.replace(/\s+/g, ' ');
+  const clean = forAddresses(text);
   for (const m of clean.matchAll(ADDRESS)) {
     const number = Number(m[1]);
     const name = m[2].replace(/\.$/, '').trim();

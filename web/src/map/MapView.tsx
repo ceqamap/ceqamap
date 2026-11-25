@@ -1,7 +1,7 @@
 import maplibregl, { type MapGeoJSONFeature, type Map as MapLibreMap, type StyleSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Protocol } from 'pmtiles';
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { MapMark, ProjectStatus, TilePointProperties } from '../../../packages/shared/src/index.ts';
 import { pingProgress } from '../lib/motion.ts';
 import {
@@ -28,6 +28,7 @@ import {
   SOURCE_ID,
   SOURCE_LAYER,
 } from './layers.ts';
+import { watchZoomFades, type ZoomFades } from './zoomFade.ts';
 
 /** Our own data sources: their errors are ours to report, not a basemap outage. */
 const DATA_SOURCES = [SOURCE_ID, AREA_SOURCE, OUTLINE_SOURCE];
@@ -58,9 +59,12 @@ export type HoverInfo =
       inReview: number;
       arrived: number;
       /** What the records list: a city, a ZIP code, a county; `several` for "cities", "counties". */
-      listed: 'city' | 'zip' | 'county';
+      listed: 'city' | 'zip' | 'county' | 'mixed';
       several: boolean;
     };
+
+/** Zoom for a project opened from a link: streets are labeled and clusters have split (cluster-maxzoom is 12). */
+const LINK_ZOOM = 15;
 
 /** A selected project known only to an area: outline these, in this color. */
 export interface SelectedArea {
@@ -141,6 +145,9 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
   // ourselves: map.isStyleLoaded() is also false while basemap tiles are still
   // streaming in, which made us skip adding the project layers (2026-11-19).
   const styleReady = useRef(false);
+  // Set once the map exists. The style is fetched first, so a project opened
+  // from a link can arrive before there is a map to move.
+  const [mapReady, setMapReady] = useState(false);
 
   useImperativeHandle(ref, () => ({
     zoomIn: () => mapRef.current?.zoomIn(),
@@ -167,6 +174,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     let map: MapLibreMap | null = null;
     let raf = 0;
     let unplaceCredits = () => {};
+    let fades: ZoomFades | null = null;
 
     (async () => {
       let style: StyleSpecification | string;
@@ -228,6 +236,9 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       phone.addEventListener('change', placeCredits);
       unplaceCredits = () => phone.removeEventListener('change', placeCredits);
       mapRef.current = map;
+      setMapReady(true);
+
+      if (!prefersReducedMotion()) fades = watchZoomFades(map);
 
       map.on('style.load', () => {
         styleReady.current = true;
@@ -310,7 +321,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
           last = t;
           const phase = (t % 2400) / 2400;
           map!.setPaintProperty(LAYER.pulse, 'circle-radius', 6 + phase * 14);
-          map!.setPaintProperty(LAYER.pulse, 'circle-opacity', 0.35 * (1 - phase));
+          map!.setPaintProperty(LAYER.pulse, 'circle-opacity', 0.35 * (1 - phase) * (fades?.shown() ?? 1));
           if (map!.getLayer(LAYER.arrivals)) {
             const ping = pingProgress(t);
             map!.setPaintProperty(
@@ -318,14 +329,22 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
               'circle-radius',
               arrivalRadius(latest.current.stages, ping, latest.current.selected, latest.current.marks),
             );
-            map!.setPaintProperty(LAYER.arrivals, 'circle-stroke-opacity', arrivalOpacity(ping));
+            map!.setPaintProperty(
+              LAYER.arrivals,
+              'circle-stroke-opacity',
+              arrivalOpacity(ping) * (fades?.shown() ?? 1),
+            );
             if (map!.getLayer(AREA_LAYER.arrivals)) {
               map!.setPaintProperty(
                 AREA_LAYER.arrivals,
                 'circle-radius',
                 arrivalRadius(latest.current.stages, ping, latest.current.selected, latest.current.marks),
               );
-              map!.setPaintProperty(AREA_LAYER.arrivals, 'circle-stroke-opacity', arrivalOpacity(ping));
+              map!.setPaintProperty(
+                AREA_LAYER.arrivals,
+                'circle-stroke-opacity',
+                arrivalOpacity(ping) * (fades?.shown() ?? 1),
+              );
             }
           }
         };
@@ -355,6 +374,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       disposed = true;
       cancelAnimationFrame(raf);
       unplaceCredits();
+      fades?.stop();
       map?.remove();
       mapRef.current = null;
     };
@@ -393,12 +413,15 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     if (!map || !props.tilesUrl || appliedTiles.current === props.tilesUrl || !styleReady.current) return;
     const source = map.getSource(SOURCE_ID) as maplibregl.VectorTileSource | undefined;
     if (source) source.setUrl(`pmtiles://${props.tilesUrl}`);
-    else
+    else {
       ensureProjectLayers(map, props.tilesUrl, {
         mode: props.basemap.mode,
         stages: latest.current.stages,
         marks: latest.current.marks,
       });
+      // The style loaded before the data did, so the selection had no source to mark yet.
+      if (appliedSelected.current) setFeature(map, appliedSelected.current, { selected: true });
+    }
     appliedTiles.current = props.tilesUrl;
   }, [props.tilesUrl, props.basemap.mode]);
 
@@ -422,6 +445,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
         LAYER.pulse,
       );
       showAreaOutline(map, latest.current.selectedArea);
+      if (appliedSelected.current) setFeature(map, appliedSelected.current, { selected: true });
     }
     appliedAreaTiles.current = areaTilesUrl;
     appliedBoundaries.current = boundariesUrl;
@@ -480,10 +504,9 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
         );
       return;
     }
-    if (!map.getBounds().contains([lon, lat]) || map.getZoom() < 9) {
-      map.flyTo({ center: [lon, lat], zoom: Math.max(map.getZoom(), 12), duration });
-    }
-  }, [props.focus]);
+    // Street level, past the cluster zoom, so the selected dot itself shows.
+    map.flyTo({ center: [lon, lat], zoom: Math.max(map.getZoom(), LINK_ZOOM), duration });
+  }, [props.focus, mapReady]);
 
   function setHovered(map: MapLibreMap, f: MapGeoJSONFeature | null) {
     const id = f ? String(f.properties.id) : null;
