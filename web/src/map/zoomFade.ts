@@ -24,7 +24,7 @@ const REGROUPING: Array<[string, string]> = [
 ];
 
 /** Dots: these only change wholesale where clusters or badges give way to them. */
-const DOTS: Array<[string, string]> = [
+const PROJECT_DOTS: Array<[string, string]> = [
   [LAYER.exact, 'circle-opacity'],
   [LAYER.exact, 'circle-stroke-opacity'],
   [LAYER.crossStreets, 'circle-opacity'],
@@ -32,6 +32,8 @@ const DOTS: Array<[string, string]> = [
   [LAYER.crossStreetsCenter, 'circle-opacity'],
   [LAYER.approx, 'circle-opacity'],
   [LAYER.approx, 'circle-stroke-opacity'],
+];
+const AREA_DOTS: Array<[string, string]> = [
   [AREA_LAYER.dots, 'circle-opacity'],
   [AREA_LAYER.dots, 'circle-stroke-opacity'],
 ];
@@ -40,9 +42,9 @@ const DOTS: Array<[string, string]> = [
 const CLUSTER_MAXZOOM = 12;
 const BADGE_MAXZOOM = 10;
 
-const DIP = 0.2; // share of full opacity at the moment of the swap
-const FADE_MS = 320;
-const MAX_WAIT_MS = 400; // fade in even if the new tiles are slow
+const DIP = 0.35; // share of full opacity at the moment of the swap
+const FADE_MS = 280;
+const MAX_WAIT_MS = 220; // fade in even if the new tiles are slow
 
 export function watchZoomFades(map: MapLibreMap): () => void {
   let level = Math.floor(map.getZoom());
@@ -95,8 +97,8 @@ export function watchZoomFades(map: MapLibreMap): () => void {
     if (lo > CLUSTER_MAXZOOM) return; // above the clusters nothing regroups
     const props = [...REGROUPING];
     // Where clusters or badges hand over to dots, the dots arrive too.
-    if ((lo <= CLUSTER_MAXZOOM && hi > CLUSTER_MAXZOOM) || (lo <= BADGE_MAXZOOM && hi > BADGE_MAXZOOM))
-      props.push(...DOTS);
+    if (lo <= CLUSTER_MAXZOOM && hi > CLUSTER_MAXZOOM) props.push(...PROJECT_DOTS);
+    if (lo <= BADGE_MAXZOOM && hi > BADGE_MAXZOOM) props.push(...AREA_DOTS);
     dip(props);
   };
 
