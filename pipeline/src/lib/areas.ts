@@ -9,7 +9,8 @@
  *
  *   up to z7   in the ordinary clusters (the main tileset), at their spiral
  *              positions, so the statewide map looks as before
- *   z8–10      one badge per city, ZIP code or county area, at its anchor
+ *   z8–10      one badge per group, at its anchor, nudged so badges don't
+ *              overlap at each zoom (groups: see displayGroup)
  *   z11+       as unclustered dots
  *
  * Badges and dots are in the area tileset (areas-<scope>.pmtiles).
@@ -162,6 +163,22 @@ export class Anchors {
     });
   }
 
+  /** The city whose outline contains a point, if any. */
+  cityAt(p: LonLat): string | null {
+    const k = `${p.lon},${p.lat}`;
+    if (!this.cities.has(k)) {
+      let found: string | null = null;
+      for (const [key, a] of Object.entries(this.b.places))
+        if (inBBox(p.lon, p.lat, a.bbox) && pointInShape(p.lon, p.lat, a.shape)) {
+          found = key;
+          break;
+        }
+      this.cities.set(k, found);
+    }
+    return this.cities.get(k)!;
+  }
+  private cities = new Map<string, string | null>();
+
   /** The anchor of an area group: of its first key. */
   of(a: PlacementArea): LonLat | null {
     const k = a.keys[0];
@@ -203,73 +220,190 @@ export interface AreaTileFeature {
   properties: Record<string, string | number>;
 }
 
+/** How a group of area projects is shown: its key, name and anchor. */
+export interface DisplayGroup {
+  key: string;
+  name: string;
+  anchor: LonLat;
+}
+
+/**
+ * The group an area's projects are shown in (badge and sunflower). ZIP codes
+ * inside a city, and records listing several cities, join that (first) city,
+ * so one downtown doesn't get a stack of badges; ZIP codes outside any city,
+ * and counties, are their own group. A project's own outline and drawer still
+ * name exactly what its record lists.
+ */
+export function displayGroup(a: PlacementArea, b: Boundaries, anchors: Anchors): DisplayGroup | null {
+  const city = (key: string): DisplayGroup | null => {
+    const anchor = anchors.city(key);
+    const place = b.places[key];
+    return anchor && place ? { key: `city:${key}`, name: place.name, anchor } : null;
+  };
+  if (a.kind === 'city') return city(a.keys[0]);
+  if (a.kind === 'zip') {
+    const anchor = anchors.zip(a.keys[0]);
+    if (!anchor) return null;
+    const inCity = anchors.cityAt(anchor);
+    return (inCity && city(inCity)) || { key: `zip:${a.keys[0]}`, name: a.keys[0], anchor };
+  }
+  const anchor = anchors.county(a.keys[0]);
+  const county = b.counties[a.keys[0]];
+  return anchor && county ? { key: `county:${a.keys[0]}`, name: `${county.name} County`, anchor } : null;
+}
+
+/** Badge radius in pixels for a count; matches the map's badge sizes (web/src/map/areaLayers.ts). */
+export function badgeRadiusPx(count: number): number {
+  return count >= 1000 ? 25 : count >= 250 ? 21 : count >= 50 ? 17 : count >= 10 ? 14 : 12;
+}
+
+/** Pixels between badges after nudging. */
+const BADGE_GAP_PX = 3;
+
+/**
+ * Nudge circles (pixel coordinates at one zoom) apart until none overlap, or
+ * after `rounds`. Bigger circles move less, so a city's badge stays near its
+ * downtown and small neighbors step aside. Deterministic.
+ */
+export function separate(circles: { x: number; y: number; r: number }[], rounds = 60): void {
+  const maxR = Math.max(0, ...circles.map((c) => c.r));
+  const cell = 2 * maxR + BADGE_GAP_PX;
+  for (let round = 0; round < rounds; round++) {
+    const grid = new Map<string, number[]>();
+    circles.forEach((c, i) => {
+      const k = `${Math.floor(c.x / cell)}:${Math.floor(c.y / cell)}`;
+      const list = grid.get(k);
+      if (list) list.push(i);
+      else grid.set(k, [i]);
+    });
+    let moved = false;
+    circles.forEach((c, i) => {
+      const cx = Math.floor(c.x / cell);
+      const cy = Math.floor(c.y / cell);
+      for (let gx = cx - 1; gx <= cx + 1; gx++)
+        for (let gy = cy - 1; gy <= cy + 1; gy++)
+          for (const j of grid.get(`${gx}:${gy}`) ?? []) {
+            if (j <= i) continue;
+            const o = circles[j];
+            let dx = o.x - c.x;
+            let dy = o.y - c.y;
+            let d = Math.hypot(dx, dy);
+            const need = c.r + o.r + BADGE_GAP_PX;
+            if (d >= need) continue;
+            if (d < 1e-6) {
+              // Same spot: split along a fixed, index-based direction.
+              const a = (i * 2.39996 + j) % (2 * Math.PI);
+              dx = Math.cos(a);
+              dy = Math.sin(a);
+              d = 1;
+            }
+            const push = need - d;
+            const share = o.r / (c.r + o.r); // the smaller one moves more
+            c.x -= (dx / d) * push * share;
+            c.y -= (dy / d) * push * share;
+            o.x += (dx / d) * push * (1 - share);
+            o.y += (dy / d) * push * (1 - share);
+            moved = true;
+          }
+    });
+    if (!moved) break;
+  }
+}
+
+const TILE_PX = 512;
+const toPx = (p: LonLat, z: number) => {
+  const w = TILE_PX * 2 ** z;
+  const sin = Math.sin((p.lat * Math.PI) / 180);
+  return { x: ((p.lon + 180) / 360) * w, y: (0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI)) * w };
+};
+const fromPx = (x: number, y: number, z: number): [number, number] => {
+  const w = TILE_PX * 2 ** z;
+  const lon = (x / w) * 360 - 180;
+  const lat = (Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / w))) * 180) / Math.PI;
+  return [Math.round(lon * 1e6) / 1e6, Math.round(lat * 1e6) / 1e6];
+};
+
 /**
  * Tile features for one time window: per project a dot (z11+, unclustered, so
  * the sunflower reads plainly) and a copy for the clustered tileset up to z7 at
- * the same spiral position; per area a badge (z8–10) counting its projects by
- * stage, so the stage filter can recount it.
+ * the same spiral position; per group a badge at each of z8, z9 and z10,
+ * nudged so badges don't overlap at that zoom, counting its projects by stage
+ * so the stage filter can recount it.
  */
 export function areaTileFeatures(
   members: AreaMember[],
   b: Boundaries,
   anchors: Anchors,
 ): { dots: AreaTileFeature[]; badges: AreaTileFeature[]; clustered: AreaTileFeature[] } {
-  const groups = new Map<string, AreaMember[]>();
+  const groups = new Map<string, { group: DisplayGroup; list: AreaMember[] }>();
   for (const m of members) {
-    const k = groupKey(m.area);
-    const list = groups.get(k);
-    if (list) list.push(m);
-    else groups.set(k, [m]);
+    const group = displayGroup(m.area, b, anchors);
+    if (!group) continue;
+    const g = groups.get(group.key);
+    if (g) g.list.push(m);
+    else groups.set(group.key, { group, list: [m] });
   }
   const dots: AreaTileFeature[] = [];
-  const badges: AreaTileFeature[] = [];
   const clustered: AreaTileFeature[] = [];
-  for (const [key, list] of groups) {
-    const area = list[0].area;
-    const anchor = anchors.of(area);
-    const bbox = areaBBox(area, b);
-    if (!anchor || !bbox) continue;
+  const badgeData: { key: string; anchor: LonLat; props: Record<string, string | number> }[] = [];
+  for (const { group, list } of groups.values()) {
     // Newest filing in the middle; SCH number breaks ties so layouts are stable.
     list.sort((x, y) =>
       x.latest < y.latest ? 1 : x.latest > y.latest ? -1 : x.point.properties.id < y.point.properties.id ? -1 : 1,
     );
     list.forEach((m, i) => {
-      const p = spiralPosition(anchor, i);
+      const p = spiralPosition(group.anchor, i);
       const props: Record<string, string | number> = {};
       for (const [k, v] of Object.entries(m.point.properties as TilePointProperties)) if (v !== undefined) props[k] = v;
+      // Each project keeps its own area's name ("95660" for a ZIP code inside Sacramento).
       const geometry = { type: 'Point' as const, coordinates: [p.lon, p.lat] as [number, number] };
       dots.push({
         type: 'Feature',
         tippecanoe: { minzoom: AREA_DOT_MINZOOM },
         geometry,
-        properties: { ...props, an: area.name },
+        properties: { ...props, an: m.area.name },
       });
       clustered.push({
         type: 'Feature',
         tippecanoe: { maxzoom: AREA_BADGE_MINZOOM - 1 },
         geometry,
-        properties: { ...props, an: area.name },
+        properties: { ...props, an: m.area.name },
       });
     });
     const counts: Record<string, number> = {};
     for (const st of STATUSES) counts[stageCountKey(st.id)] = 0;
     for (const m of list) counts[stageCountKey(m.point.properties.s)]++;
-    badges.push({
-      type: 'Feature',
-      tippecanoe: { minzoom: AREA_BADGE_MINZOOM, maxzoom: AREA_DOT_MINZOOM - 1 },
-      geometry: { type: 'Point', coordinates: [anchor.lon, anchor.lat] },
-      properties: {
+    // What the records list: "city", "zip", "county", or "mixed" (a city and ZIP codes in it).
+    const kinds = new Set(list.map((m) => m.area.kind));
+    const listed = kinds.size > 1 ? 'mixed' : [...kinds][0];
+    const several = list.every((m) => m.area.keys.length > 1) ? 1 : 0;
+    badgeData.push({
+      key: group.key,
+      anchor: group.anchor,
+      props: {
         f: 'b',
-        id: key,
-        an: area.name,
-        // What the record lists: "city", "zip", "county"; `am` when several ("cities", "counties").
-        ak: area.kind,
-        am: area.keys.length > 1 ? 1 : 0,
+        id: group.key,
+        an: group.name,
+        ak: listed,
+        am: several,
         ...counts,
         n: list.filter((m) => m.point.properties.n).length,
         total: list.length,
       },
     });
+  }
+  const badges: AreaTileFeature[] = [];
+  for (let z = AREA_BADGE_MINZOOM; z < AREA_DOT_MINZOOM; z++) {
+    const circles = badgeData.map((d) => ({ ...toPx(d.anchor, z), r: badgeRadiusPx(Number(d.props.total)) }));
+    separate(circles);
+    badgeData.forEach((d, i) =>
+      badges.push({
+        type: 'Feature',
+        tippecanoe: { minzoom: z, maxzoom: z },
+        geometry: { type: 'Point', coordinates: fromPx(circles[i].x, circles[i].y, z) },
+        properties: d.props,
+      }),
+    );
   }
   return { dots, badges, clustered };
 }

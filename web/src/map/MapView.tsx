@@ -58,7 +58,7 @@ export type HoverInfo =
       inReview: number;
       arrived: number;
       /** What the records list: a city, a ZIP code, a county; `several` for "cities", "counties". */
-      listed: 'city' | 'zip' | 'county';
+      listed: 'city' | 'zip' | 'county' | 'mixed';
       several: boolean;
     };
 

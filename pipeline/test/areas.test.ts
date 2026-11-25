@@ -6,6 +6,9 @@ import {
   Anchors,
   areaTileFeatures,
   type AreaMember,
+  badgeRadiusPx,
+  displayGroup,
+  separate,
   boundaryFeatures,
   interiorPoint,
   spiralPosition,
@@ -145,19 +148,57 @@ describe('area tiles', () => {
       clustered.map((d) => d.tippecanoe),
       [{ maxzoom: 7 }, { maxzoom: 7 }, { maxzoom: 7 }],
     );
-    assert.equal(badges.length, 1);
-    assert.deepEqual(badges[0].tippecanoe, { minzoom: 8, maxzoom: 10 });
-    assert.deepEqual(badges[0].geometry.coordinates, [-119.7871, 36.7378]);
+    // One badge per zoom (8, 9, 10), at the anchor when nothing is nearby.
+    assert.deepEqual(
+      badges.map((x) => x.tippecanoe),
+      [
+        { minzoom: 8, maxzoom: 8 },
+        { minzoom: 9, maxzoom: 9 },
+        { minzoom: 10, maxzoom: 10 },
+      ],
+    );
+    for (const badge of badges) {
+      assert.ok(Math.abs(badge.geometry.coordinates[0] - -119.7871) < 1e-5);
+      assert.ok(Math.abs(badge.geometry.coordinates[1] - 36.7378) < 1e-5);
+    }
     assert.equal(badges[0].properties.an, 'Fresno');
     assert.equal(badges[0].properties.ak, 'city');
     assert.equal(badges[0].properties.total, 3);
     assert.equal(badges[0].properties.c_exempt, 2);
     assert.equal(badges[0].properties.c_in_review, 1);
-    // Same spot in both, so clusters split apart into the sunflower.
-    assert.deepEqual(
-      clustered.map((d) => d.geometry.coordinates),
-      dots.map((d) => d.geometry.coordinates),
+  });
+
+  it('shows ZIP codes inside a city, and lists of cities, with that city', () => {
+    assert.equal(displayGroup({ kind: 'zip', keys: ['93721'], name: '93721' }, B, anchors)?.key, 'city:fresno');
+    assert.equal(
+      displayGroup({ kind: 'city', keys: ['fresno', 'clovis'], name: 'Fresno and Clovis' }, B, anchors)?.key,
+      'city:fresno',
     );
+    const zipMember: AreaMember = {
+      ...member('z', 'exempt', '2026-04-01'),
+      area: { kind: 'zip', keys: ['93721'], name: '93721' },
+    };
+    const { dots, badges } = areaTileFeatures([member('a', 'exempt', '2026-01-01'), zipMember], B, anchors);
+    const z8 = badges.filter((x) => x.tippecanoe.minzoom === 8);
+    assert.equal(z8.length, 1);
+    assert.equal(z8[0].properties.total, 2);
+    assert.equal(z8[0].properties.ak, 'mixed');
+    // The project still carries its own area's name.
+    assert.equal(dots.find((d) => d.properties.id === 'z')?.properties.an, '93721');
+  });
+
+  it('nudges badges apart so none overlap, moving the smaller one more', () => {
+    const big = { x: 100, y: 100, r: badgeRadiusPx(400) };
+    const small = { x: 104, y: 100, r: badgeRadiusPx(3) };
+    const same = { x: 100, y: 100, r: badgeRadiusPx(3) };
+    const circles = [big, small, same];
+    separate(circles);
+    for (let i = 0; i < circles.length; i++)
+      for (let j = i + 1; j < circles.length; j++) {
+        const d = Math.hypot(circles[i].x - circles[j].x, circles[i].y - circles[j].y);
+        assert.ok(d >= circles[i].r + circles[j].r + 2.9, `circles ${i} and ${j} overlap: ${d}`);
+      }
+    assert.ok(Math.hypot(big.x - 100, big.y - 100) < Math.hypot(small.x - 104, small.y - 100));
   });
 
   it('emits outlines keyed like published areas', () => {

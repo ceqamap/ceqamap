@@ -47,15 +47,17 @@ export function HoverCard({
 
   if (info.kind === 'area') {
     const what =
-      info.listed === 'zip'
-        ? 'ZIP code'
-        : info.listed === 'city'
-          ? info.several
-            ? 'cities'
-            : 'city'
-          : info.several
-            ? 'counties'
-            : 'county';
+      info.listed === 'mixed'
+        ? 'city or ZIP code'
+        : info.listed === 'zip'
+          ? 'ZIP code'
+          : info.listed === 'city'
+            ? info.several
+              ? 'cities'
+              : 'city'
+            : info.several
+              ? 'counties'
+              : 'county';
     return (
       <div className="hover-card card" style={style} role="tooltip">
         <p className="hover-title">{info.name}</p>
