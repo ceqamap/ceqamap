@@ -28,6 +28,7 @@ import {
   SOURCE_ID,
   SOURCE_LAYER,
 } from './layers.ts';
+import { watchZoomFades } from './zoomFade.ts';
 
 /** Our own data sources: their errors are ours to report, not a basemap outage. */
 const DATA_SOURCES = [SOURCE_ID, AREA_SOURCE, OUTLINE_SOURCE];
@@ -173,6 +174,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
     let map: MapLibreMap | null = null;
     let raf = 0;
     let unplaceCredits = () => {};
+    let unwatchFades = () => {};
 
     (async () => {
       let style: StyleSpecification | string;
@@ -235,6 +237,8 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       unplaceCredits = () => phone.removeEventListener('change', placeCredits);
       mapRef.current = map;
       setMapReady(true);
+
+      if (!prefersReducedMotion()) unwatchFades = watchZoomFades(map);
 
       map.on('style.load', () => {
         styleReady.current = true;
@@ -362,6 +366,7 @@ export const MapView = forwardRef<MapViewHandle, MapViewProps>(function MapView(
       disposed = true;
       cancelAnimationFrame(raf);
       unplaceCredits();
+      unwatchFades();
       map?.remove();
       mapRef.current = null;
     };
