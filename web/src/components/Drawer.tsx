@@ -83,7 +83,10 @@ export function Drawer({ sch, mode, onClose, onLoaded }: Props) {
   }, [sch]);
 
   useEffect(() => {
-    if (state.kind === 'ready') heading.current?.focus();
+    // preventScroll: on phones the drawer is a bottom sheet that starts below
+    // the screen. A cached project is ready before the sheet has slid up, and
+    // a plain focus() makes iOS scroll the whole page to reveal the heading.
+    if (state.kind === 'ready') heading.current?.focus({ preventScroll: true });
   }, [state]);
 
   useEffect(() => {
